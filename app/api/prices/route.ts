@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { getPriceData, sortCompanies } from "@/lib/prices";
+import { sortCompanies } from "@/lib/prices";
+import { getPriceData } from "@/lib/prices-server";
 
 export const dynamic = "force-dynamic";
 

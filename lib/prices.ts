@@ -61,12 +61,16 @@ export interface PriceData {
   companies: Company[];
 }
 
-const SHEET_ID =
+export const SHEET_ID =
   process.env.PRICES_SHEET_ID ||
   "1LPgDarhRJJU_j7vywFI6kSOH8d6kvTPjsGkz--kkiCY";
 
+// シート内の読み取り範囲（A列〜O列＝No,会社コード,会社名＋12単価列）。
+// 1シート目（gid=0）の全行を取り、ヘッダ行はパーサ側で弾く。
+export const SHEET_RANGE = process.env.PRICES_SHEET_RANGE || "A1:O100";
+
 // 公開CSVのエンドポイント候補（公開されていれば読める）
-function csvUrls(): string[] {
+export function csvUrls(): string[] {
   return [
     `https://docs.google.com/spreadsheets/d/${SHEET_ID}/export?format=csv&gid=0`,
     `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv`,
@@ -74,7 +78,7 @@ function csvUrls(): string[] {
 }
 
 // ---- CSVパーサ（クォート内カンマ対応） ----
-function parseCSV(text: string): string[][] {
+export function parseCSV(text: string): string[][] {
   const rows: string[][] = [];
   let row: string[] = [];
   let cur = "";
@@ -132,7 +136,7 @@ const RATE_ORDER: RateKey[] = [
   "yushi_holiday_ot",
 ];
 
-function parseCompanyListCsv(rows: string[][]): Company[] {
+export function parseCompanyListCsv(rows: string[][]): Company[] {
   const companies: Company[] = [];
   for (const r of rows) {
     if (!/^\d+$/.test((r[0] || "").trim())) continue; // データ行のみ
@@ -149,11 +153,7 @@ function parseCompanyListCsv(rows: string[][]): Company[] {
   return companies;
 }
 
-// ---- メモリキャッシュ（60秒） ----
-let cache: { data: PriceData; at: number } | null = null;
-const CACHE_MS = 60_000;
-
-function snapshotData(live: boolean): PriceData {
+export function snapshotData(live: boolean): PriceData {
   const s = snapshot as unknown as {
     source: string;
     capturedAt: string;
@@ -176,44 +176,43 @@ function snapshotData(live: boolean): PriceData {
   };
 }
 
-async function tryFetchLive(): Promise<Company[] | null> {
-  for (const url of csvUrls()) {
-    try {
-      const res = await fetch(url, {
-        // サーバ側fetch・キャッシュ無効
-        cache: "no-store",
-        redirect: "follow",
-        headers: { "User-Agent": "mitsumori-app/1.0" },
-      });
-      if (!res.ok) continue;
-      const ct = res.headers.get("content-type") || "";
-      const text = await res.text();
-      // ログインページ等のHTMLが返ってきたら失敗扱い
-      if (ct.includes("text/html") || text.trimStart().startsWith("<")) continue;
-      const rows = parseCSV(text);
-      const companies = parseCompanyListCsv(rows);
-      if (companies.length > 0) return companies;
-    } catch {
-      // 次のURLへ
-    }
-  }
-  return null;
+// ---- サービスアカウント認証情報（env） ----
+// シートを「全公開」にせず、サービスアカウントにだけ閲覧共有して
+// Sheets API で読み取る。鍵は次のいずれかの形で env に入れる：
+//   (A) GOOGLE_SA_JSON … サービスアカウント鍵JSON全文（client_email/private_key を含む）
+//   (B) GOOGLE_SA_EMAIL ＋ GOOGLE_SA_PRIVATE_KEY … メールと秘密鍵を分けて格納
+// private_key 内の "\n" は実改行に戻す（Vercel env は改行を \n で持つことが多い）。
+export interface SaCreds {
+  client_email: string;
+  private_key: string;
 }
 
-// 単価データを返す。ライブ取得を試し、失敗時はスナップショットにフォールバック。
-export async function getPriceData(): Promise<PriceData> {
-  if (cache && Date.now() - cache.at < CACHE_MS) return cache.data;
-
-  const live = await tryFetchLive();
-  let data: PriceData;
-  if (live && live.length) {
-    const base = snapshotData(true);
-    data = { ...base, companies: live };
-  } else {
-    data = snapshotData(false);
+export function readSaCreds(
+  env: NodeJS.ProcessEnv = process.env
+): SaCreds | null {
+  const raw = env.GOOGLE_SA_JSON;
+  if (raw && raw.trim()) {
+    try {
+      const j = JSON.parse(raw);
+      if (j.client_email && j.private_key) {
+        return {
+          client_email: String(j.client_email),
+          private_key: String(j.private_key).replace(/\\n/g, "\n"),
+        };
+      }
+    } catch {
+      // JSON崩れ → 個別env / フォールバックへ
+    }
   }
-  cache = { data, at: Date.now() };
-  return data;
+  const email = env.GOOGLE_SA_EMAIL;
+  const key = env.GOOGLE_SA_PRIVATE_KEY;
+  if (email && key) {
+    return {
+      client_email: email,
+      private_key: key.replace(/\\n/g, "\n"),
+    };
+  }
+  return null;
 }
 
 // 会社一覧（単価が入っている会社を先頭に）

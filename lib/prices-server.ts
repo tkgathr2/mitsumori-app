@@ -1,0 +1,96 @@
+import "server-only";
+import {
+  type Company,
+  type PriceData,
+  SHEET_ID,
+  SHEET_RANGE,
+  csvUrls,
+  parseCSV,
+  parseCompanyListCsv,
+  readSaCreds,
+  snapshotData,
+} from "./prices";
+
+// このモジュールはサーバ専用（googleapis = Node 依存）。
+// クライアントから import される lib/prices.ts には絶対に置かない。
+
+// ---- メモリキャッシュ（60秒） ----
+let cache: { data: PriceData; at: number } | null = null;
+const CACHE_MS = 60_000;
+
+// サービスアカウント＋Sheets API でライブ読み取り。
+// 鍵が無い／読めない場合は null を返し、呼び出し側がCSV→スナップショットへフォールバック。
+async function tryFetchViaServiceAccount(): Promise<Company[] | null> {
+  const creds = readSaCreds();
+  if (!creds) return null;
+  try {
+    // googleapis は実行時にだけ読む（鍵が無い環境ではロードもしない）
+    const { google } = await import("googleapis");
+    const auth = new google.auth.JWT({
+      email: creds.client_email,
+      key: creds.private_key,
+      scopes: ["https://www.googleapis.com/auth/spreadsheets.readonly"],
+    });
+    const sheets = google.sheets({ version: "v4", auth });
+    const res = await sheets.spreadsheets.values.get({
+      spreadsheetId: SHEET_ID,
+      range: SHEET_RANGE,
+      valueRenderOption: "UNFORMATTED_VALUE",
+    });
+    const rows = (res.data.values || []).map((r) =>
+      (r as unknown[]).map((c) => (c == null ? "" : String(c)))
+    );
+    const companies = parseCompanyListCsv(rows);
+    return companies.length > 0 ? companies : null;
+  } catch {
+    return null;
+  }
+}
+
+// 公開CSV経由のライブ取得（シートが公開されている場合のみ成功）。
+async function tryFetchViaPublicCsv(): Promise<Company[] | null> {
+  for (const url of csvUrls()) {
+    try {
+      const res = await fetch(url, {
+        // サーバ側fetch・キャッシュ無効
+        cache: "no-store",
+        redirect: "follow",
+        headers: { "User-Agent": "mitsumori-app/1.0" },
+      });
+      if (!res.ok) continue;
+      const ct = res.headers.get("content-type") || "";
+      const text = await res.text();
+      // ログインページ等のHTMLが返ってきたら失敗扱い
+      if (ct.includes("text/html") || text.trimStart().startsWith("<")) continue;
+      const rows = parseCSV(text);
+      const companies = parseCompanyListCsv(rows);
+      if (companies.length > 0) return companies;
+    } catch {
+      // 次のURLへ
+    }
+  }
+  return null;
+}
+
+// ライブ取得：①サービスアカウント（推奨・非公開のまま）→ ②公開CSV の順に試す。
+async function tryFetchLive(): Promise<Company[] | null> {
+  const viaSa = await tryFetchViaServiceAccount();
+  if (viaSa && viaSa.length) return viaSa;
+  return tryFetchViaPublicCsv();
+}
+
+// 単価データを返す。ライブ取得を試し、失敗時はスナップショットにフォールバック。
+export async function getPriceData(): Promise<PriceData> {
+  if (cache && Date.now() - cache.at < CACHE_MS) return cache.data;
+
+  const live = await tryFetchLive();
+  let data: PriceData;
+  if (live && live.length) {
+    const base = snapshotData(true);
+    data = { ...base, companies: live };
+  } else {
+    data = snapshotData(false);
+  }
+  cache = { data, at: Date.now() };
+  return data;
+}
