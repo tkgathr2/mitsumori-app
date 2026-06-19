@@ -1,0 +1,39 @@
+<svg width='680' height='470' viewBox='0 0 680 470' xmlns='http://www.w3.org/2000/svg'>
+<rect width='680' height='470' fill='#FFFFFF'/>
+<circle cx='340' cy='250' r='196' fill='#FFF4EA'/>
+<ellipse cx='300' cy='408' rx='30' ry='17' fill='#1A3050'/>
+<ellipse cx='380' cy='408' rx='30' ry='17' fill='#1A3050'/>
+<ellipse cx='340' cy='320' rx='118' ry='106' fill='#27456B'/>
+<circle cx='340' cy='212' r='112' fill='#2C4A73'/>
+<ellipse cx='232' cy='318' rx='26' ry='46' fill='#27456B'/>
+<ellipse cx='448' cy='318' rx='26' ry='46' fill='#27456B'/>
+<polygon points='340,50 295,120 385,120' fill='#FF6A2C'/>
+<polygon points='320,80 360,80 372,100 308,100' fill='#FFFFFF'/>
+<rect x='285' y='116' width='110' height='17' rx='6' fill='#FF7E3E'/>
+<rect x='279' y='131' width='122' height='11' rx='5' fill='#E85D1F'/>
+<circle cx='286' cy='250' r='19' fill='#FF8A5C' opacity='0.6'/>
+<circle cx='394' cy='250' r='19' fill='#FF8A5C' opacity='0.6'/>
+<ellipse cx='303' cy='208' rx='26' ry='33' fill='#FFFFFF'/>
+<ellipse cx='377' cy='208' rx='26' ry='33' fill='#FFFFFF'/>
+<circle cx='308' cy='213' r='15' fill='#16263B'/>
+<circle cx='372' cy='213' r='15' fill='#16263B'/>
+<circle cx='302' cy='206' r='6' fill='#FFFFFF'/>
+<circle cx='366' cy='206' r='6' fill='#FFFFFF'/>
+<circle cx='314' cy='220' r='3' fill='#FFFFFF' opacity='0.8'/>
+<circle cx='378' cy='220' r='3' fill='#FFFFFF' opacity='0.8'/>
+<path d='M320 250 Q340 276 360 250 Q340 264 320 250 Z' fill='#C2410C'/>
+<rect x='289' y='318' width='102' height='82' rx='12' fill='#2BB39A'/>
+<rect x='300' y='330' width='80' height='26' rx='5' fill='#EAFBF6'/>
+<text x='368' y='350' font-family='sans-serif' font-size='19' fill='#127A66' text-anchor='end' font-weight='700'>¥</text>
+<text x='312' y='350' font-family='sans-serif' font-size='13' fill='#1F8C77' text-anchor='start'>見積</text>
+<circle cx='307' cy='372' r='6' fill='#FFFFFF'/>
+<circle cx='328' cy='372' r='6' fill='#FFFFFF'/>
+<circle cx='349' cy='372' r='6' fill='#FFFFFF'/>
+<circle cx='370' cy='372' r='6' fill='#FF7E3E'/>
+<circle cx='307' cy='389' r='6' fill='#FFFFFF'/>
+<circle cx='328' cy='389' r='6' fill='#FFFFFF'/>
+<circle cx='349' cy='389' r='6' fill='#FFFFFF'/>
+<circle cx='370' cy='389' r='6' fill='#FF7E3E'/>
+<ellipse cx='263' cy='356' rx='20' ry='17' fill='#335577'/>
+<ellipse cx='417' cy='356' rx='20' ry='17' fill='#335577'/>
+</svg>

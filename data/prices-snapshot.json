@@ -1,0 +1,594 @@
+{
+  "source": "v3_一覧.csv (西村さんマスタ v3 2026-06-12)",
+  "capturedAt": "2026-06-13",
+  "sheetId": "1LPgDarhRJJU_j7vywFI6kSOH8d6kvTPjsGkz--kkiCY",
+  "equipment": [
+    {
+      "name": "カラーコーン・重り込み(10個1セット)",
+      "unit": "式",
+      "price": 4500
+    },
+    {
+      "name": "コーンバー(10個1セット)",
+      "unit": "式",
+      "price": 4500
+    },
+    {
+      "name": "点滅灯(10個1セット)",
+      "unit": "式",
+      "price": 6000
+    }
+  ],
+  "companies": [
+    {
+      "code": "A0002",
+      "name": "株式会社GOOD PLACE",
+      "prices": {
+        "ippan_day": 0,
+        "ippan_day_ot": 0,
+        "ippan_night": 0,
+        "ippan_night_ot": 0,
+        "ippan_holiday": 0,
+        "ippan_holiday_ot": 0,
+        "yushi_day": 0,
+        "yushi_day_ot": 0,
+        "yushi_night": 0,
+        "yushi_night_ot": 0,
+        "yushi_holiday": 0,
+        "yushi_holiday_ot": 0
+      },
+      "hasPrice": false
+    },
+    {
+      "code": "A0003",
+      "name": "三和警備保障株式会社",
+      "prices": {
+        "ippan_day": 0,
+        "ippan_day_ot": 0,
+        "ippan_night": 0,
+        "ippan_night_ot": 0,
+        "ippan_holiday": 0,
+        "ippan_holiday_ot": 0,
+        "yushi_day": 0,
+        "yushi_day_ot": 0,
+        "yushi_night": 0,
+        "yushi_night_ot": 0,
+        "yushi_holiday": 0,
+        "yushi_holiday_ot": 0
+      },
+      "hasPrice": false
+    },
+    {
+      "code": "A0004",
+      "name": "アールシースタッフ株式会社",
+      "prices": {
+        "ippan_day": 0,
+        "ippan_day_ot": 0,
+        "ippan_night": 0,
+        "ippan_night_ot": 0,
+        "ippan_holiday": 0,
+        "ippan_holiday_ot": 0,
+        "yushi_day": 0,
+        "yushi_day_ot": 0,
+        "yushi_night": 0,
+        "yushi_night_ot": 0,
+        "yushi_holiday": 0,
+        "yushi_holiday_ot": 0
+      },
+      "hasPrice": false
+    },
+    {
+      "code": "A0005",
+      "name": "有限会社三和ピー・エックス",
+      "prices": {
+        "ippan_day": 0,
+        "ippan_day_ot": 0,
+        "ippan_night": 0,
+        "ippan_night_ot": 0,
+        "ippan_holiday": 0,
+        "ippan_holiday_ot": 0,
+        "yushi_day": 0,
+        "yushi_day_ot": 0,
+        "yushi_night": 0,
+        "yushi_night_ot": 0,
+        "yushi_holiday": 0,
+        "yushi_holiday_ot": 0
+      },
+      "hasPrice": false
+    },
+    {
+      "code": "A0006",
+      "name": "株式会社SANJYU",
+      "prices": {
+        "ippan_day": 18000,
+        "ippan_day_ot": 0,
+        "ippan_night": 22500,
+        "ippan_night_ot": 0,
+        "ippan_holiday": 24300,
+        "ippan_holiday_ot": 0,
+        "yushi_day": 21000,
+        "yushi_day_ot": 0,
+        "yushi_night": 26250,
+        "yushi_night_ot": 0,
+        "yushi_holiday": 28350,
+        "yushi_holiday_ot": 0
+      },
+      "hasPrice": true
+    },
+    {
+      "code": "A0007",
+      "name": "東洋リニューアル株式会社",
+      "prices": {
+        "ippan_day": 0,
+        "ippan_day_ot": 0,
+        "ippan_night": 0,
+        "ippan_night_ot": 0,
+        "ippan_holiday": 0,
+        "ippan_holiday_ot": 0,
+        "yushi_day": 0,
+        "yushi_day_ot": 0,
+        "yushi_night": 0,
+        "yushi_night_ot": 0,
+        "yushi_holiday": 0,
+        "yushi_holiday_ot": 0
+      },
+      "hasPrice": false
+    },
+    {
+      "code": "A0008",
+      "name": "株式会社ビッグフラッグ",
+      "prices": {
+        "ippan_day": 0,
+        "ippan_day_ot": 0,
+        "ippan_night": 0,
+        "ippan_night_ot": 0,
+        "ippan_holiday": 0,
+        "ippan_holiday_ot": 0,
+        "yushi_day": 0,
+        "yushi_day_ot": 0,
+        "yushi_night": 0,
+        "yushi_night_ot": 0,
+        "yushi_holiday": 0,
+        "yushi_holiday_ot": 0
+      },
+      "hasPrice": false
+    },
+    {
+      "code": "A0009",
+      "name": "株式会社藤田盛工務店",
+      "prices": {
+        "ippan_day": 18000,
+        "ippan_day_ot": 2813,
+        "ippan_night": 22500,
+        "ippan_night_ot": 3516,
+        "ippan_holiday": 24300,
+        "ippan_holiday_ot": 3797,
+        "yushi_day": 21000,
+        "yushi_day_ot": 3281,
+        "yushi_night": 26250,
+        "yushi_night_ot": 4102,
+        "yushi_holiday": 28350,
+        "yushi_holiday_ot": 4430
+      },
+      "hasPrice": true
+    },
+    {
+      "code": "A0010",
+      "name": "有限会社藤原資材",
+      "prices": {
+        "ippan_day": 15000,
+        "ippan_day_ot": 2344,
+        "ippan_night": 18750,
+        "ippan_night_ot": 2930,
+        "ippan_holiday": 20250,
+        "ippan_holiday_ot": 3164,
+        "yushi_day": 18000,
+        "yushi_day_ot": 2813,
+        "yushi_night": 22500,
+        "yushi_night_ot": 3516,
+        "yushi_holiday": 24300,
+        "yushi_holiday_ot": 3797
+      },
+      "hasPrice": true
+    },
+    {
+      "code": "A0012",
+      "name": "株式会社マルニコーポレーション",
+      "prices": {
+        "ippan_day": 0,
+        "ippan_day_ot": 0,
+        "ippan_night": 0,
+        "ippan_night_ot": 0,
+        "ippan_holiday": 0,
+        "ippan_holiday_ot": 0,
+        "yushi_day": 0,
+        "yushi_day_ot": 0,
+        "yushi_night": 0,
+        "yushi_night_ot": 0,
+        "yushi_holiday": 0,
+        "yushi_holiday_ot": 0
+      },
+      "hasPrice": false
+    },
+    {
+      "code": "A0013",
+      "name": "株式会社大貴技建",
+      "prices": {
+        "ippan_day": 16000,
+        "ippan_day_ot": 2500,
+        "ippan_night": 20000,
+        "ippan_night_ot": 3125,
+        "ippan_holiday": 21600,
+        "ippan_holiday_ot": 3375,
+        "yushi_day": 19000,
+        "yushi_day_ot": 2969,
+        "yushi_night": 23750,
+        "yushi_night_ot": 3711,
+        "yushi_holiday": 25650,
+        "yushi_holiday_ot": 4008
+      },
+      "hasPrice": true
+    },
+    {
+      "code": "A0014",
+      "name": "西田鉄工株式会社",
+      "prices": {
+        "ippan_day": 0,
+        "ippan_day_ot": 0,
+        "ippan_night": 0,
+        "ippan_night_ot": 0,
+        "ippan_holiday": 0,
+        "ippan_holiday_ot": 0,
+        "yushi_day": 0,
+        "yushi_day_ot": 0,
+        "yushi_night": 0,
+        "yushi_night_ot": 0,
+        "yushi_holiday": 0,
+        "yushi_holiday_ot": 0
+      },
+      "hasPrice": false
+    },
+    {
+      "code": "A0015",
+      "name": "日東河川工業株式会社",
+      "prices": {
+        "ippan_day": 0,
+        "ippan_day_ot": 0,
+        "ippan_night": 0,
+        "ippan_night_ot": 0,
+        "ippan_holiday": 0,
+        "ippan_holiday_ot": 0,
+        "yushi_day": 0,
+        "yushi_day_ot": 0,
+        "yushi_night": 0,
+        "yushi_night_ot": 0,
+        "yushi_holiday": 0,
+        "yushi_holiday_ot": 0
+      },
+      "hasPrice": false
+    },
+    {
+      "code": "A0016",
+      "name": "株式会社TOC",
+      "prices": {
+        "ippan_day": 16000,
+        "ippan_day_ot": 2500,
+        "ippan_night": 20000,
+        "ippan_night_ot": 3125,
+        "ippan_holiday": 21600,
+        "ippan_holiday_ot": 3375,
+        "yushi_day": 19000,
+        "yushi_day_ot": 2969,
+        "yushi_night": 23750,
+        "yushi_night_ot": 3711,
+        "yushi_holiday": 25650,
+        "yushi_holiday_ot": 4008
+      },
+      "hasPrice": true
+    },
+    {
+      "code": "A0017",
+      "name": "株式会社エース",
+      "prices": {
+        "ippan_day": 0,
+        "ippan_day_ot": 0,
+        "ippan_night": 0,
+        "ippan_night_ot": 0,
+        "ippan_holiday": 0,
+        "ippan_holiday_ot": 0,
+        "yushi_day": 0,
+        "yushi_day_ot": 0,
+        "yushi_night": 0,
+        "yushi_night_ot": 0,
+        "yushi_holiday": 0,
+        "yushi_holiday_ot": 0
+      },
+      "hasPrice": false
+    },
+    {
+      "code": "A0018",
+      "name": "株式会社デュー・ワークスタジオ",
+      "prices": {
+        "ippan_day": 18000,
+        "ippan_day_ot": 2813,
+        "ippan_night": 22500,
+        "ippan_night_ot": 3516,
+        "ippan_holiday": 24300,
+        "ippan_holiday_ot": 3797,
+        "yushi_day": 21000,
+        "yushi_day_ot": 3281,
+        "yushi_night": 26250,
+        "yushi_night_ot": 4102,
+        "yushi_holiday": 28350,
+        "yushi_holiday_ot": 4430
+      },
+      "hasPrice": true
+    },
+    {
+      "code": "A0019",
+      "name": "有限会社三愛",
+      "prices": {
+        "ippan_day": 16000,
+        "ippan_day_ot": 2500,
+        "ippan_night": 20000,
+        "ippan_night_ot": 3125,
+        "ippan_holiday": 21600,
+        "ippan_holiday_ot": 3375,
+        "yushi_day": 19000,
+        "yushi_day_ot": 2969,
+        "yushi_night": 23750,
+        "yushi_night_ot": 3711,
+        "yushi_holiday": 25650,
+        "yushi_holiday_ot": 4008
+      },
+      "hasPrice": true
+    },
+    {
+      "code": "A0020",
+      "name": "株式会社神警エンタープライズ",
+      "prices": {
+        "ippan_day": 0,
+        "ippan_day_ot": 0,
+        "ippan_night": 0,
+        "ippan_night_ot": 0,
+        "ippan_holiday": 0,
+        "ippan_holiday_ot": 0,
+        "yushi_day": 0,
+        "yushi_day_ot": 0,
+        "yushi_night": 0,
+        "yushi_night_ot": 0,
+        "yushi_holiday": 0,
+        "yushi_holiday_ot": 0
+      },
+      "hasPrice": false
+    },
+    {
+      "code": "A0021",
+      "name": "株式会社ベネフィットライン",
+      "prices": {
+        "ippan_day": 18000,
+        "ippan_day_ot": 2813,
+        "ippan_night": 22500,
+        "ippan_night_ot": 3516,
+        "ippan_holiday": 24300,
+        "ippan_holiday_ot": 3797,
+        "yushi_day": 21000,
+        "yushi_day_ot": 3281,
+        "yushi_night": 26250,
+        "yushi_night_ot": 4102,
+        "yushi_holiday": 28350,
+        "yushi_holiday_ot": 4430
+      },
+      "hasPrice": true
+    },
+    {
+      "code": "A0022",
+      "name": "大豊工業株式会社",
+      "prices": {
+        "ippan_day": 0,
+        "ippan_day_ot": 0,
+        "ippan_night": 0,
+        "ippan_night_ot": 0,
+        "ippan_holiday": 0,
+        "ippan_holiday_ot": 0,
+        "yushi_day": 0,
+        "yushi_day_ot": 0,
+        "yushi_night": 0,
+        "yushi_night_ot": 0,
+        "yushi_holiday": 0,
+        "yushi_holiday_ot": 0
+      },
+      "hasPrice": false
+    },
+    {
+      "code": "A0023",
+      "name": "タイガーセキュリティー",
+      "prices": {
+        "ippan_day": 0,
+        "ippan_day_ot": 0,
+        "ippan_night": 0,
+        "ippan_night_ot": 0,
+        "ippan_holiday": 0,
+        "ippan_holiday_ot": 0,
+        "yushi_day": 0,
+        "yushi_day_ot": 0,
+        "yushi_night": 0,
+        "yushi_night_ot": 0,
+        "yushi_holiday": 0,
+        "yushi_holiday_ot": 0
+      },
+      "hasPrice": false
+    },
+    {
+      "code": "A0024",
+      "name": "千代田レイヤー株式会社",
+      "prices": {
+        "ippan_day": 0,
+        "ippan_day_ot": 0,
+        "ippan_night": 0,
+        "ippan_night_ot": 0,
+        "ippan_holiday": 0,
+        "ippan_holiday_ot": 0,
+        "yushi_day": 0,
+        "yushi_day_ot": 0,
+        "yushi_night": 0,
+        "yushi_night_ot": 0,
+        "yushi_holiday": 0,
+        "yushi_holiday_ot": 0
+      },
+      "hasPrice": false
+    },
+    {
+      "code": "A0026",
+      "name": "株式会社アーキプロット",
+      "prices": {
+        "ippan_day": 0,
+        "ippan_day_ot": 0,
+        "ippan_night": 0,
+        "ippan_night_ot": 0,
+        "ippan_holiday": 0,
+        "ippan_holiday_ot": 0,
+        "yushi_day": 0,
+        "yushi_day_ot": 0,
+        "yushi_night": 0,
+        "yushi_night_ot": 0,
+        "yushi_holiday": 0,
+        "yushi_holiday_ot": 0
+      },
+      "hasPrice": false
+    },
+    {
+      "code": "A0027",
+      "name": "株式会社大作",
+      "prices": {
+        "ippan_day": 0,
+        "ippan_day_ot": 0,
+        "ippan_night": 0,
+        "ippan_night_ot": 0,
+        "ippan_holiday": 0,
+        "ippan_holiday_ot": 0,
+        "yushi_day": 0,
+        "yushi_day_ot": 0,
+        "yushi_night": 0,
+        "yushi_night_ot": 0,
+        "yushi_holiday": 0,
+        "yushi_holiday_ot": 0
+      },
+      "hasPrice": false
+    },
+    {
+      "code": "A0029",
+      "name": "株式会社平林建設",
+      "prices": {
+        "ippan_day": 0,
+        "ippan_day_ot": 0,
+        "ippan_night": 0,
+        "ippan_night_ot": 0,
+        "ippan_holiday": 0,
+        "ippan_holiday_ot": 0,
+        "yushi_day": 0,
+        "yushi_day_ot": 0,
+        "yushi_night": 0,
+        "yushi_night_ot": 0,
+        "yushi_holiday": 0,
+        "yushi_holiday_ot": 0
+      },
+      "hasPrice": false
+    },
+    {
+      "code": "A0030",
+      "name": "株式会社三協",
+      "prices": {
+        "ippan_day": 0,
+        "ippan_day_ot": 0,
+        "ippan_night": 0,
+        "ippan_night_ot": 0,
+        "ippan_holiday": 0,
+        "ippan_holiday_ot": 0,
+        "yushi_day": 0,
+        "yushi_day_ot": 0,
+        "yushi_night": 0,
+        "yushi_night_ot": 0,
+        "yushi_holiday": 0,
+        "yushi_holiday_ot": 0
+      },
+      "hasPrice": false
+    },
+    {
+      "code": "A0031",
+      "name": "株式会社エレクソンキューブ",
+      "prices": {
+        "ippan_day": 0,
+        "ippan_day_ot": 0,
+        "ippan_night": 0,
+        "ippan_night_ot": 0,
+        "ippan_holiday": 0,
+        "ippan_holiday_ot": 0,
+        "yushi_day": 0,
+        "yushi_day_ot": 0,
+        "yushi_night": 0,
+        "yushi_night_ot": 0,
+        "yushi_holiday": 0,
+        "yushi_holiday_ot": 0
+      },
+      "hasPrice": false
+    },
+    {
+      "code": "A0033",
+      "name": "株式会社REnista",
+      "prices": {
+        "ippan_day": 0,
+        "ippan_day_ot": 0,
+        "ippan_night": 0,
+        "ippan_night_ot": 0,
+        "ippan_holiday": 0,
+        "ippan_holiday_ot": 0,
+        "yushi_day": 0,
+        "yushi_day_ot": 0,
+        "yushi_night": 0,
+        "yushi_night_ot": 0,
+        "yushi_holiday": 0,
+        "yushi_holiday_ot": 0
+      },
+      "hasPrice": false
+    },
+    {
+      "code": "A0034",
+      "name": "株式会社きんき商店",
+      "prices": {
+        "ippan_day": 16000,
+        "ippan_day_ot": 2500,
+        "ippan_night": 20000,
+        "ippan_night_ot": 3125,
+        "ippan_holiday": 21600,
+        "ippan_holiday_ot": 3375,
+        "yushi_day": 19000,
+        "yushi_day_ot": 2969,
+        "yushi_night": 23750,
+        "yushi_night_ot": 3711,
+        "yushi_holiday": 25650,
+        "yushi_holiday_ot": 4008
+      },
+      "hasPrice": true
+    },
+    {
+      "code": "A0035",
+      "name": "株式会社万代技研",
+      "prices": {
+        "ippan_day": 15000,
+        "ippan_day_ot": 2344,
+        "ippan_night": 18750,
+        "ippan_night_ot": 2930,
+        "ippan_holiday": 20250,
+        "ippan_holiday_ot": 3164,
+        "yushi_day": 18000,
+        "yushi_day_ot": 2813,
+        "yushi_night": 22500,
+        "yushi_night_ot": 3516,
+        "yushi_holiday": 24300,
+        "yushi_holiday_ot": 3797
+      },
+      "hasPrice": true
+    }
+  ]
+}

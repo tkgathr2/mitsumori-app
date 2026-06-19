@@ -1,0 +1,13 @@
+{
+  "name": "見積もり自動化システム",
+  "short_name": "見積もりくん",
+  "description": "会社・区分・人数・日数を入れるだけで見積金額が自動で出るシステム",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#1d4ed8",
+  "icons": [
+    { "src": "/icon512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "/icon.svg", "type": "image/svg+xml" }
+  ]
+}
