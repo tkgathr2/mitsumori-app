@@ -134,6 +134,7 @@ export default function Page() {
   }
 
   async function onMfClick() {
+    setToast("MFに見積書を作成中…");
     try {
       const res = await fetch("/api/mf-quote", {
         method: "POST",
@@ -146,10 +147,14 @@ export default function Page() {
       });
       const j = await res.json();
       setToast(j.message || "送信しました");
+      // 見積書PDFができたら新しいタブで開く
+      if (j.ok && j.pdfUrl) {
+        window.open(j.pdfUrl, "_blank", "noopener,noreferrer");
+      }
     } catch (e) {
       setToast("通信エラー: " + String(e));
     }
-    setTimeout(() => setToast(null), 5000);
+    setTimeout(() => setToast(null), 8000);
   }
 
   if (err) {
@@ -418,7 +423,7 @@ export default function Page() {
                 MFに見積を作成
               </button>
               <p className="muted" style={{ marginTop: 8 }}>
-                ※ MFクラウド連携はフェーズ2で対応予定です。
+                ※ 押すとMFクラウド請求書に見積書を作成し、PDFを開きます。
               </p>
             </div>
           </div>
