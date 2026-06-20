@@ -35,16 +35,24 @@ MFアプリポータル（`https://app-portal.moneyforward.com/apps/` → 株式
 | `MF_CLIENT_ID` | ✅ | OAuthアプリの Client ID（`337171679680541`） |
 | `MF_CLIENT_SECRET` | ✅ | OAuthアプリの Client Secret |
 | `MF_REDIRECT_URI` | 任意 | 既定は本番URL。ローカルでは `http://localhost:3000/api/mf-callback` を設定 |
-| `KV_REST_API_URL` | 推奨 | Vercel KV（Upstash Redis）。トークン永続化に使う |
-| `KV_REST_API_TOKEN` | 推奨 | 同上 |
-| `MF_REFRESH_TOKEN` | 代替 | KVが無い場合のブートストラップ用 refresh_token |
+| `DATABASE_URL` | ✅ | 自前 Railway Postgres の接続URL。トークン永続化に使う（テーブル `mf_oauth_tokens` を自動作成） |
+| `MF_REFRESH_TOKEN` | 代替 | DBが空のときの初回ブートストラップ用 refresh_token（以後はDBが正本） |
+
+> トークンの保存先は **自前 Railway Postgres**（`DATABASE_URL`）。Vercel KV / Upstash は使わない
+> （マーケットプレイスの規約同意・課金導線を避けるため）。`@vercel/kv` 依存は撤去済み。
+> `DATABASE_URL` を渡すと初回アクセス時に `mf_oauth_tokens` テーブルを `CREATE TABLE IF NOT EXISTS`
+> で自動作成し、refresh のたびに新トークンを1行 upsert する（MFのローテーションに追従）。
+>
+> 注意: `DATABASE_URL` には `?sslmode=...` を付けないこと。アプリ側は `ssl: { rejectUnauthorized: false }`
+> を明示指定しており、URLに `sslmode` があると `pg`（pg-connection-string）がそれを優先して
+> self-signed 証明書を弾く。
 
 ### 設定コマンド例
 
 ```bash
 vercel env add MF_CLIENT_ID production   # 337171679680541
 vercel env add MF_CLIENT_SECRET production
-# Vercel KV を作成して接続すると KV_REST_API_URL / KV_REST_API_TOKEN は自動付与される
+vercel env add DATABASE_URL production   # 自前 Railway Postgres の接続URL（sslmode は付けない）
 ```
 
 ## 初回の連携手順（1回だけ）
@@ -53,16 +61,16 @@ vercel env add MF_CLIENT_SECRET production
 2. ブラウザで **`https://mitsumori-app-pied.vercel.app/api/mf-auth`** を開く。
    → MFの認可画面に飛ぶ（日本交通誘導でログイン済みのこと）。
 3. 「許可」すると `/api/mf-callback` に戻り、`{"ok":true,...}` が表示される。
-   - **Vercel KV を設定済み**なら access/refresh token はKVに保存され、以後は自動。
-   - **KV未設定**なら応答に `refresh_token` が表示されるので、それを
-     Vercel env `MF_REFRESH_TOKEN` に登録して再デプロイ（永続化）。
+   - **`DATABASE_URL` を設定済み**なら access/refresh token は Postgres の `mf_oauth_tokens`
+     テーブルに保存され、以後は自動（refresh のたびに新トークンで上書き＝MFローテーションに追従）。
+   - DB未設定なら応答に `refresh_token` が表示されるので、`DATABASE_URL` を設定し直してから再連携する。
 4. これで完了。アプリの「MFに見積を作成」ボタンが使えるようになる。
 
 ## トークンの更新と失効防止
 
 - `access_token` は **1時間**有効。API呼び出し時に期限切れなら自動で `refresh_token` で更新する。
 - `refresh_token` は **18か月**有効。ただし**使うたびに新しいものに置き換わる**ため、
-  更新のたびKVへ書き戻す。
+  更新のたび Postgres へ書き戻す（`saveTokens` が1行 upsert）。これが永続化の肝。
 - 長期間未使用だと失効するリスクがあるため、**月1回ヘルスチェックを叩いて access_token を
   更新**しておくこと（refresh_token も新しくなり実質失効しない）。
 
