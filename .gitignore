@@ -6,3 +6,10 @@ out
 *.tsbuildinfo
 next-env.d.ts
 .DS_Store
+# --- Secrets / env files (added 2026-06-25: pre-public security audit CTO室-42) ---
+.env
+.env.*
+!.env.example
+*.pem
+credentials*.json
+serviceAccount*.json
