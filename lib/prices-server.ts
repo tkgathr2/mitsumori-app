@@ -19,7 +19,7 @@ let cache: { data: PriceData; at: number } | null = null;
 const CACHE_MS = 60_000;
 
 // サービスアカウント＋Sheets API でライブ読み取り。
-// 鍵が無い／読めない場合は null を返し、呼び出し側がCSV→スナップショットへフォールバック。
+// 鍵が無い／読めない場合は null を返し、呼び出し側がDBキャッシュ→スナップショットへフォールバック。
 async function tryFetchViaServiceAccount(): Promise<Company[] | null> {
   const creds = readSaCreds();
   if (!creds) return null;
@@ -42,6 +42,22 @@ async function tryFetchViaServiceAccount(): Promise<Company[] | null> {
     );
     const companies = parseCompanyListCsv(rows);
     return companies.length > 0 ? companies : null;
+  } catch {
+    return null;
+  }
+}
+
+// DBキャッシュ（GASが定期pushした最新データ）経由のライブ取得。
+async function tryFetchFromDbCache(): Promise<Company[] | null> {
+  if (!process.env.DATABASE_URL) return null;
+  try {
+    const { loadPriceCache } = await import("./price-cache-db");
+    const row = await loadPriceCache();
+    if (!row) return null;
+    const payload = row.payload as { companies: Company[] };
+    if (!Array.isArray(payload?.companies) || payload.companies.length === 0)
+      return null;
+    return payload.companies;
   } catch {
     return null;
   }
@@ -72,10 +88,12 @@ async function tryFetchViaPublicCsv(): Promise<Company[] | null> {
   return null;
 }
 
-// ライブ取得：①サービスアカウント（推奨・非公開のまま）→ ②公開CSV の順に試す。
+// ライブ取得：①SA → ②DBキャッシュ（GAS push）→ ③公開CSV の順に試す。
 async function tryFetchLive(): Promise<Company[] | null> {
   const viaSa = await tryFetchViaServiceAccount();
   if (viaSa && viaSa.length) return viaSa;
+  const viaDb = await tryFetchFromDbCache();
+  if (viaDb && viaDb.length) return viaDb;
   return tryFetchViaPublicCsv();
 }
 
