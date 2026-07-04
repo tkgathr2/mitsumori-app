@@ -215,10 +215,10 @@ export default function Page() {
   return (
     <div className="wrap">
       <header className="hero">
-        <img src="/icon512.png" alt="見積もりくん" />
+        <img src="/favicon.svg" alt="みつもりくん" style={{ width: "64px", height: "64px" }} />
         <div>
-          <h1>見積もり自動化システム</h1>
-          <p>会社を選んで、区分・人数・日数を入れるだけ。金額は自動で出ます。</p>
+          <h1>みつもりくん</h1>
+          <p>会社を選んで、区分・人数・日数を入れるだけで、見積金額が一瞬で出ます。</p>
         </div>
         <span className={"sync-badge " + (data.live ? "live" : "snapshot")}>
           <span className="dot" />

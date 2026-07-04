@@ -3,21 +3,21 @@ import Script from "next/script";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "見積もり自動化システム",
+  title: "みつもりくん | 見積金額を一瞬で自動計算",
   description:
-    "会社を選んで、区分・人数・日数を入れるだけで見積金額が自動で出ます。",
+    "会社を選んで区分・人数・日数を入れるだけで、見積金額が自動で出ます。警備業の見積作成をシンプルに。",
   manifest: "/manifest.json",
   icons: {
     icon: [
+      { url: "/favicon.svg", type: "image/svg+xml" },
       { url: "/icon.png", type: "image/png" },
-      { url: "/icon.svg", type: "image/svg+xml" },
     ],
     apple: "/icon512.png",
   },
 };
 
 export const viewport: Viewport = {
-  themeColor: "#1d4ed8",
+  themeColor: "#3b82f6",
 };
 
 export default function RootLayout({

@@ -1,12 +1,13 @@
 {
-  "name": "見積もり自動化システム",
-  "short_name": "見積もりくん",
-  "description": "会社・区分・人数・日数を入れるだけで見積金額が自動で出るシステム",
+  "name": "みつもりくん",
+  "short_name": "みつもりくん",
+  "description": "会社を選んで、区分・人数・日数を入れるだけで見積金額が一瞬で出ます。警備業の見積作成をシンプルに。",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#ffffff",
-  "theme_color": "#1d4ed8",
+  "theme_color": "#3b82f6",
   "icons": [
+    { "src": "/favicon.svg", "sizes": "any", "type": "image/svg+xml" },
     { "src": "/icon512.png", "sizes": "512x512", "type": "image/png" },
     { "src": "/icon.svg", "type": "image/svg+xml" }
   ]
