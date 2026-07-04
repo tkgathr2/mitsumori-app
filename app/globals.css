@@ -277,3 +277,126 @@ footer.foot a {
   text-align: center;
   color: var(--muted);
 }
+
+/* ---- 管理画面 /admin ---- */
+.admin-tabs {
+  display: flex;
+  gap: 8px;
+  margin: 12px 0 16px;
+}
+.admin-tabs button {
+  font-weight: 600;
+}
+.admin-tabs button.active {
+  background: var(--brand);
+  border-color: var(--brand);
+  color: #fff;
+}
+
+.matrix-scroll {
+  overflow-x: auto;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: #fff;
+}
+table.matrix {
+  border-collapse: collapse;
+  font-size: 13px;
+  min-width: 100%;
+}
+table.matrix th,
+table.matrix td {
+  border: 1px solid var(--line);
+  padding: 6px 8px;
+  white-space: nowrap;
+}
+table.matrix thead th {
+  background: var(--brand-soft);
+  position: sticky;
+  top: 0;
+  font-weight: 700;
+  text-align: center;
+  z-index: 1;
+}
+table.matrix th.company-col {
+  position: sticky;
+  left: 0;
+  background: #fff;
+  text-align: left;
+  min-width: 200px;
+  z-index: 2;
+}
+table.matrix thead th.company-col {
+  background: var(--brand-soft);
+  z-index: 3;
+}
+table.matrix td.price-cell {
+  text-align: right;
+  cursor: pointer;
+  min-width: 90px;
+}
+table.matrix td.price-cell:hover {
+  background: #f0f7ff;
+}
+table.matrix td.price-cell input {
+  width: 84px;
+  padding: 3px 5px;
+  text-align: right;
+  font-size: 13px;
+}
+table.matrix .company-name {
+  font-weight: 600;
+}
+table.matrix .company-meta {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.admin-toolbar {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  align-items: center;
+  margin-bottom: 12px;
+}
+.admin-toolbar .spacer {
+  margin-left: auto;
+}
+
+table.history {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+table.history th,
+table.history td {
+  border-bottom: 1px solid var(--line);
+  padding: 8px 10px;
+  text-align: left;
+}
+table.history th {
+  color: var(--muted);
+  font-weight: 600;
+  font-size: 12px;
+}
+.history .old {
+  color: var(--muted);
+  text-decoration: line-through;
+}
+.history .new {
+  color: var(--ok);
+  font-weight: 700;
+}
+
+.edit-row {
+  display: grid;
+  grid-template-columns: 120px 1fr 1fr auto auto;
+  gap: 8px;
+  align-items: end;
+  margin-bottom: 8px;
+}
+@media (max-width: 720px) {
+  .edit-row {
+    grid-template-columns: 1fr 1fr;
+  }
+}
