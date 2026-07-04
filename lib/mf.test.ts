@@ -104,6 +104,27 @@ describe("createMfQuote", () => {
     expect(arg.expired_date).toMatch(/^\d{4}-\d{2}-\d{2}$/);
   });
 
+  it("単価を手動上書きした行は、上書き後の単価がMF明細にそのまま渡る", async () => {
+    // UI側で resolveUnitPrice(autoPrice, overridePrice) が解決した後の
+    // QuoteLine を想定（overridePrice=20000 が unitPrice に反映済み）。
+    const overriddenLines: QuoteLine[] = [
+      { name: "昼一般", unitPrice: 20000, unit: "人日", people: 2, days: 3 }, // 元は18000だが上書き
+    ];
+    await createMfQuote({
+      companyName: "株式会社日本交通誘導",
+      lines: overriddenLines,
+      totals: calcTotals(overriddenLines),
+    });
+    const [arg] = mocks.createQuote.mock.calls[0];
+    expect(arg.items).toHaveLength(1);
+    expect(arg.items[0]).toMatchObject({
+      name: "昼一般",
+      price: 20000, // 上書き後の単価がMF側にそのまま渡る
+      quantity: 6,
+      excise: "ten_percent",
+    });
+  });
+
   it("金額0の行は除外する", async () => {
     const withZero: QuoteLine[] = [
       ...lines,

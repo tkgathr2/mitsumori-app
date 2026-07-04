@@ -22,6 +22,18 @@ export interface QuoteTotals {
 
 export const TAX_RATE = 0.1;
 
+// 手動上書き単価があればそれを優先し、なければ自動計算単価を使う。
+// overridePrice が undefined/null/NaN の場合は自動単価にフォールバックする。
+export function resolveUnitPrice(
+  autoPrice: number,
+  overridePrice?: number | null
+): number {
+  if (overridePrice != null && !Number.isNaN(overridePrice)) {
+    return overridePrice;
+  }
+  return autoPrice;
+}
+
 // 1行の数量を求める
 export function lineQuantity(line: QuoteLine): number {
   if (line.people != null || line.days != null) {
