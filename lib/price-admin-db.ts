@@ -69,6 +69,20 @@ async function ensureSchema(): Promise<void> {
            changed_at   timestamptz DEFAULT NOW()
          )`
       );
+      await pool.query(
+        `CREATE TABLE IF NOT EXISTS quotes (
+           id           serial PRIMARY KEY,
+           company_code text NOT NULL,
+           name         text NOT NULL DEFAULT '',
+           quote_data   jsonb NOT NULL,
+           data_hash    text NOT NULL DEFAULT '',
+           created_at   timestamptz DEFAULT NOW()
+         )`
+      );
+      await pool.query(
+        `CREATE INDEX IF NOT EXISTS quotes_company_created
+           ON quotes(company_code, created_at DESC)`
+      );
     })()
       .then(() => undefined)
       .catch((e) => {
@@ -380,6 +394,83 @@ export async function loadCompaniesForPriceData(): Promise<Company[]> {
       hasPrice: Object.values(prices).some((v) => v > 0),
     };
   });
+}
+
+// ---- 見積履歴（会社ごと・直近5「種類」= 同一明細はまとめて1種類） ----
+export interface QuoteRow {
+  id: number;
+  companyCode: string;
+  name: string;
+  quoteData: unknown;
+  createdAt: string;
+}
+
+// 明細内容から安定ハッシュを作る（同一構成の重複判定用）
+function hashQuoteData(data: unknown): string {
+  const s = JSON.stringify(data);
+  let h = 5381;
+  for (let i = 0; i < s.length; i++) {
+    h = ((h << 5) + h + s.charCodeAt(i)) | 0;
+  }
+  return (h >>> 0).toString(36) + "_" + s.length;
+}
+
+export async function saveQuote(
+  companyCode: string,
+  name: string,
+  quoteData: unknown
+): Promise<QuoteRow> {
+  await ensureSchema();
+  const res = await getPool().query<{
+    id: number;
+    company_code: string;
+    name: string;
+    quote_data: unknown;
+    created_at: string;
+  }>(
+    `INSERT INTO quotes (company_code, name, quote_data, data_hash)
+     VALUES ($1, $2, $3::jsonb, $4)
+     RETURNING id, company_code, name, quote_data, created_at`,
+    [companyCode, name, JSON.stringify(quoteData), hashQuoteData(quoteData)]
+  );
+  const r = res.rows[0];
+  return {
+    id: r.id,
+    companyCode: r.company_code,
+    name: r.name,
+    quoteData: r.quote_data,
+    createdAt: r.created_at,
+  };
+}
+
+// 直近の見積を「種類」単位で最大 limit 件（同じ data_hash は最新1件に集約）
+export async function listQuotesByCompany(companyCode: string, limit = 5): Promise<QuoteRow[]> {
+  if (!isDbConfigured()) return [];
+  await ensureSchema();
+  const res = await getPool().query<{
+    id: number;
+    company_code: string;
+    name: string;
+    quote_data: unknown;
+    created_at: string;
+  }>(
+    `SELECT DISTINCT ON (data_hash)
+            id, company_code, name, quote_data, created_at
+       FROM quotes
+      WHERE company_code = $1
+      ORDER BY data_hash, created_at DESC`,
+    [companyCode]
+  );
+  return res.rows
+    .sort((a, b) => (a.created_at < b.created_at ? 1 : -1))
+    .slice(0, limit)
+    .map((r) => ({
+      id: r.id,
+      companyCode: r.company_code,
+      name: r.name,
+      quoteData: r.quote_data,
+      createdAt: r.created_at,
+    }));
 }
 
 // DBに「生きている会社」が1件でもあるか（getPriceData のDB優先判定用）。

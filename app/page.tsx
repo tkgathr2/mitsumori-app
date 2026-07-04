@@ -39,6 +39,14 @@ type Row = {
   qty: string; // 自由行: 数量
 };
 
+// 保存済み見積（過去の見積呼び出し用）
+type PastQuote = {
+  id: number;
+  name: string;
+  quoteData: { rows: Omit<Row, "id">[]; total: number };
+  createdAt: string;
+};
+
 let _id = 1;
 const newSecurityRow = (): Row => ({
   id: _id++,
@@ -74,6 +82,7 @@ export default function Page() {
   const [rows, setRows] = useState<Row[]>([newSecurityRow()]);
   const [toast, setToast] = useState<string | null>(null);
   const [editingPriceId, setEditingPriceId] = useState<number | null>(null);
+  const [pastQuotes, setPastQuotes] = useState<PastQuote[]>([]);
 
   // localStorage から会社履歴を読込
   useEffect(() => {
@@ -114,6 +123,70 @@ export default function Page() {
     () => data?.companies.find((c) => c.code === companyCode) || null,
     [data, companyCode]
   );
+
+  // 会社を選んだら過去の見積（直近5種類）を取得
+  useEffect(() => {
+    if (!companyCode) {
+      setPastQuotes([]);
+      return;
+    }
+    let cancelled = false;
+    fetch(`/api/quotes?company=${encodeURIComponent(companyCode)}`)
+      .then((r) => r.json())
+      .then((j: { quotes?: PastQuote[] }) => {
+        if (!cancelled) setPastQuotes(j.quotes ?? []);
+      })
+      .catch(() => {
+        if (!cancelled) setPastQuotes([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [companyCode]);
+
+  // 現在の明細を履歴として保存（同一内容はサーバー側で1種類に集約）
+  async function saveCurrentQuote(silent = false): Promise<void> {
+    if (!companyCode) return;
+    const cleanRows = rows.map(({ id: _drop, ...rest }) => rest);
+    try {
+      const res = await fetch("/api/quotes", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          companyCode,
+          name: `${new Date().toLocaleDateString("ja-JP")} ${yen(totals.total)}`,
+          quoteData: { rows: cleanRows, total: totals.total },
+        }),
+      });
+      if (res.ok) {
+        const j = (await fetch(
+          `/api/quotes?company=${encodeURIComponent(companyCode)}`
+        ).then((r) => r.json())) as { quotes?: PastQuote[] };
+        setPastQuotes(j.quotes ?? []);
+        if (!silent) {
+          setToast("この見積を履歴に保存しました");
+          setTimeout(() => setToast(null), 4000);
+        }
+      } else if (!silent) {
+        setToast("履歴の保存に失敗しました");
+        setTimeout(() => setToast(null), 4000);
+      }
+    } catch {
+      if (!silent) {
+        setToast("履歴の保存に失敗しました（通信エラー）");
+        setTimeout(() => setToast(null), 4000);
+      }
+    }
+  }
+
+  // 過去の見積を呼び出して明細に展開
+  function loadPastQuote(q: PastQuote): void {
+    const saved = q.quoteData?.rows;
+    if (!Array.isArray(saved) || saved.length === 0) return;
+    setRows(saved.map((r) => ({ ...r, id: _id++ })));
+    setToast(`過去の見積「${q.name}」を呼び出しました`);
+    setTimeout(() => setToast(null), 4000);
+  }
 
   // 区分→単価（選択中の会社で引く）
   function ratePrice(key: RateKey): number {
@@ -188,6 +261,8 @@ export default function Page() {
       if (j.ok && j.pdfUrl) {
         window.open(j.pdfUrl, "_blank", "noopener,noreferrer");
       }
+      // MFに作成できた見積は履歴にも自動保存
+      if (j.ok) void saveCurrentQuote(true);
     } catch (e) {
       setToast("通信エラー: " + String(e));
     }
@@ -419,6 +494,41 @@ export default function Page() {
               <p className="muted">
                 この会社はまだ単価が登録されていません。区分を選んでも0円になります。
               </p>
+            )}
+            {pastQuotes.length > 0 && (
+              <div style={{ marginTop: 12 }}>
+                <div style={{ fontSize: 13, fontWeight: 600, color: "#3b82f6", marginBottom: 6 }}>
+                  この会社の過去の見積（直近{pastQuotes.length}種類・クリックで呼び出し）
+                </div>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                  {pastQuotes.map((q) => (
+                    <button
+                      key={q.id}
+                      type="button"
+                      onClick={() => loadPastQuote(q)}
+                      style={{
+                        padding: "8px 12px",
+                        background: "white",
+                        border: "1px solid #bfdbfe",
+                        borderRadius: 6,
+                        cursor: "pointer",
+                        textAlign: "left",
+                        fontSize: 12,
+                        lineHeight: 1.5,
+                      }}
+                      onMouseEnter={(e) => (e.currentTarget.style.background = "#eff6ff")}
+                      onMouseLeave={(e) => (e.currentTarget.style.background = "white")}
+                    >
+                      <span style={{ fontWeight: 600 }}>{q.name || "（無題）"}</span>
+                      <br />
+                      <span style={{ color: "#64748b", fontSize: 11 }}>
+                        {new Date(q.createdAt).toLocaleDateString("ja-JP")}・
+                        {q.quoteData?.rows?.length ?? 0}行
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </div>
             )}
           </div>
 
@@ -665,6 +775,27 @@ export default function Page() {
               </button>
               <p className="muted" style={{ marginTop: 8 }}>
                 ※ 押すとMFクラウド請求書に見積書を作成し、PDFを開きます。
+              </p>
+              <button
+                type="button"
+                style={{
+                  width: "100%",
+                  marginTop: 8,
+                  padding: "10px 12px",
+                  background: "white",
+                  color: "#3b82f6",
+                  border: "1px solid #3b82f6",
+                  borderRadius: 6,
+                  cursor: "pointer",
+                  fontSize: 14,
+                  fontWeight: 600,
+                }}
+                onClick={() => void saveCurrentQuote()}
+              >
+                この見積を履歴に保存
+              </button>
+              <p className="muted" style={{ marginTop: 8 }}>
+                ※ 保存すると、次回この会社を選んだとき「過去の見積」から呼び出せます。
               </p>
             </div>
           </div>
