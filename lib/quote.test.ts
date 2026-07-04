@@ -1,5 +1,28 @@
 import { describe, it, expect } from "vitest";
-import { lineQuantity, lineAmount, calcTotals, yen, QuoteLine } from "./quote";
+import {
+  lineQuantity,
+  lineAmount,
+  calcTotals,
+  resolveUnitPrice,
+  yen,
+  QuoteLine,
+} from "./quote";
+
+describe("resolveUnitPrice", () => {
+  it("overridePrice が無ければ自動単価を使う", () => {
+    expect(resolveUnitPrice(18000, undefined)).toBe(18000);
+    expect(resolveUnitPrice(18000, null)).toBe(18000);
+  });
+  it("overridePrice があればそれを優先する", () => {
+    expect(resolveUnitPrice(18000, 15000)).toBe(15000);
+  });
+  it("overridePrice が0でも上書きとして採用する（値引き用途）", () => {
+    expect(resolveUnitPrice(18000, 0)).toBe(0);
+  });
+  it("overridePrice が NaN なら自動単価にフォールバックする", () => {
+    expect(resolveUnitPrice(18000, NaN)).toBe(18000);
+  });
+});
 
 describe("lineQuantity", () => {
   it("警備行は 人数×日数", () => {
@@ -69,5 +92,42 @@ describe("yen", () => {
   it("桁区切り", () => {
     expect(yen(128700)).toBe("¥128,700");
     expect(yen(0)).toBe("¥0");
+  });
+});
+
+describe("単価上書き round-trip（resolveUnitPrice → QuoteLine → 金額計算）", () => {
+  it("上書き単価が QuoteLine.unitPrice に反映され、金額計算にも通る", () => {
+    const autoPrice = 18000;
+    const overridePrice = 20000;
+    const unitPrice = resolveUnitPrice(autoPrice, overridePrice);
+
+    const line: QuoteLine = {
+      name: "昼一般",
+      unitPrice,
+      unit: "人日",
+      people: 2,
+      days: 3,
+    };
+    expect(line.unitPrice).toBe(20000);
+    expect(lineAmount(line)).toBe(120000); // 20,000 × 6人日
+
+    const t = calcTotals([line]);
+    expect(t.subtotal).toBe(120000);
+    expect(t.tax).toBe(12000);
+    expect(t.total).toBe(132000);
+  });
+
+  it("上書きしなければ自動単価のまま金額計算される", () => {
+    const autoPrice = 18000;
+    const unitPrice = resolveUnitPrice(autoPrice, undefined);
+    const line: QuoteLine = {
+      name: "昼一般",
+      unitPrice,
+      unit: "人日",
+      people: 2,
+      days: 3,
+    };
+    expect(line.unitPrice).toBe(18000);
+    expect(lineAmount(line)).toBe(108000);
   });
 });

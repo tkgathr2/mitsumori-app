@@ -208,6 +208,12 @@ button.del {
   border-color: #fecaca;
   padding: 7px 10px;
 }
+button.edit-price {
+  color: var(--brand);
+  border-color: #bfdbfe;
+  padding: 7px 10px;
+  white-space: nowrap;
+}
 
 .btnrow {
   display: flex;

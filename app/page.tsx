@@ -7,7 +7,13 @@ import {
   type Company,
   type EquipmentItem,
 } from "@/lib/prices";
-import { calcTotals, lineAmount, yen, type QuoteLine } from "@/lib/quote";
+import {
+  calcTotals,
+  lineAmount,
+  resolveUnitPrice,
+  yen,
+  type QuoteLine,
+} from "@/lib/quote";
 
 type ApiData = {
   source: string;
@@ -27,6 +33,7 @@ type Row = {
   name: string; // 自由行の品目名
   unit: string;
   unitPrice: number; // 自由行で使う単価
+  overridePrice?: number; // 警備行で手動上書きした単価（あれば優先）
   people: string; // 警備行: 人数
   days: string; // 警備行: 日数
   qty: string; // 自由行: 数量
@@ -62,6 +69,7 @@ export default function Page() {
   const [companyCode, setCompanyCode] = useState("");
   const [rows, setRows] = useState<Row[]>([newSecurityRow()]);
   const [toast, setToast] = useState<string | null>(null);
+  const [editingPriceId, setEditingPriceId] = useState<number | null>(null);
 
   useEffect(() => {
     fetch("/api/prices")
@@ -98,7 +106,8 @@ export default function Page() {
         qty: Number(row.qty) || 0,
       };
     }
-    const price = row.rateKey ? ratePrice(row.rateKey) : 0;
+    const autoPrice = row.rateKey ? ratePrice(row.rateKey) : 0;
+    const price = resolveUnitPrice(autoPrice, row.overridePrice);
     const unit = row.rateKey ? rateUnit(row.rateKey) : "人日";
     if (unit === "時間") {
       // 残業（時間）: 数量 = 時間。people欄を時間として使う、days非表示。
@@ -294,6 +303,7 @@ export default function Page() {
                               onChange={(e) =>
                                 update(row.id, {
                                   rateKey: e.target.value as RateKey,
+                                  overridePrice: undefined,
                                 })
                               }
                             >
@@ -310,7 +320,8 @@ export default function Page() {
                             {yen(amount)}
                             <div className="unitprice">
                               {row.rateKey
-                                ? `単価 ${yen(ratePrice(row.rateKey))}/${unit}`
+                                ? `単価 ${yen(ql.unitPrice)}/${unit}` +
+                                  (row.overridePrice != null ? "（上書き）" : "")
                                 : ""}
                             </div>
                           </div>
@@ -354,7 +365,38 @@ export default function Page() {
                               </label>
                             </>
                           )}
-                          <div />
+                          {row.rateKey && editingPriceId === row.id ? (
+                            <label className="field" style={{ margin: 0 }}>
+                              <span>単価（円・上書き）</span>
+                              <input
+                                type="number"
+                                inputMode="numeric"
+                                autoFocus
+                                value={
+                                  row.overridePrice ?? ratePrice(row.rateKey as RateKey)
+                                }
+                                onChange={(e) =>
+                                  update(row.id, {
+                                    overridePrice: Number(e.target.value) || 0,
+                                  })
+                                }
+                                onBlur={() => setEditingPriceId(null)}
+                              />
+                            </label>
+                          ) : row.rateKey ? (
+                            <button
+                              type="button"
+                              className="edit-price"
+                              onClick={() => setEditingPriceId(row.id)}
+                              title="単価を手動で上書きする"
+                            >
+                              {row.overridePrice != null
+                                ? "単価編集中（上書きあり）"
+                                : "単価編集"}
+                            </button>
+                          ) : (
+                            <div />
+                          )}
                           <button
                             className="del"
                             onClick={() => remove(row.id)}
