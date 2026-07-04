@@ -69,9 +69,35 @@ export default function Page() {
   const [companyCode, setCompanyCode] = useState("");
   const [companySearch, setCompanySearch] = useState<string | undefined>();
   const [showCompanyList, setShowCompanyList] = useState(false);
+  const [companyMode, setCompanyMode] = useState<"select" | "search">("select");
+  const [companyHistory, setCompanyHistory] = useState<string[]>([]);
   const [rows, setRows] = useState<Row[]>([newSecurityRow()]);
   const [toast, setToast] = useState<string | null>(null);
   const [editingPriceId, setEditingPriceId] = useState<number | null>(null);
+
+  // localStorage から会社履歴を読込
+  useEffect(() => {
+    const saved = localStorage.getItem("companyHistory");
+    if (saved) {
+      try {
+        setCompanyHistory(JSON.parse(saved));
+      } catch {}
+    }
+  }, []);
+
+  // 会社を選択したら履歴に追加・ソート
+  const selectCompany = (code: string) => {
+    setCompanyCode(code);
+    setCompanySearch(undefined);
+    setShowCompanyList(false);
+
+    const updated = [code, ...companyHistory.filter((c) => c !== code)].slice(
+      0,
+      10
+    ); // 最大10件
+    setCompanyHistory(updated);
+    localStorage.setItem("companyHistory", JSON.stringify(updated));
+  };
 
   useEffect(() => {
     fetch("/api/prices")
@@ -204,104 +230,191 @@ export default function Page() {
         <main>
           <div className="card">
             <h2>1. 会社を選ぶ</h2>
-            <label className="field">
-              <span>会社（単価表の会社）</span>
-              <div style={{ position: "relative" }}>
-                <input
-                  type="text"
-                  placeholder="会社名で検索..."
-                  value={
-                    companySearch !== undefined
-                      ? companySearch
-                      : data.companies.find((c) => c.code === companyCode)
-                          ?.name || ""
-                  }
-                  onChange={(e) => {
-                    setCompanySearch(e.target.value);
-                    const match = data.companies.find(
-                      (c) =>
-                        c.name.toLowerCase() ===
-                        e.target.value.toLowerCase()
-                    );
-                    if (match) setCompanyCode(match.code);
-                  }}
-                  onFocus={() => setShowCompanyList(true)}
-                  onBlur={() => setTimeout(() => setShowCompanyList(false), 200)}
-                  style={{
-                    width: "100%",
-                    padding: "8px",
-                    border: "1px solid #ccc",
-                    borderRadius: "4px",
-                    fontSize: "14px",
-                  }}
-                />
-                {showCompanyList && companySearch !== undefined && (
-                  <div
+            <div style={{ display: "flex", gap: "8px", marginBottom: "12px" }}>
+              <button
+                onClick={() => setCompanyMode("select")}
+                style={{
+                  padding: "6px 12px",
+                  background: companyMode === "select" ? "#007bff" : "#e9ecef",
+                  color: companyMode === "select" ? "white" : "black",
+                  border: "none",
+                  borderRadius: "4px",
+                  cursor: "pointer",
+                  fontSize: "13px",
+                }}
+              >
+                選択式
+              </button>
+              <button
+                onClick={() => setCompanyMode("search")}
+                style={{
+                  padding: "6px 12px",
+                  background: companyMode === "search" ? "#007bff" : "#e9ecef",
+                  color: companyMode === "search" ? "white" : "black",
+                  border: "none",
+                  borderRadius: "4px",
+                  cursor: "pointer",
+                  fontSize: "13px",
+                }}
+              >
+                検索式
+              </button>
+            </div>
+
+            {companyMode === "select" ? (
+              <label className="field">
+                <span>会社（単価表の会社）</span>
+                <div style={{ overflowY: "auto", maxHeight: "300px" }}>
+                  {companyHistory.length > 0 && (
+                    <>
+                      <div style={{ fontSize: "12px", color: "#666", marginBottom: "8px", fontWeight: "bold" }}>最近使った会社</div>
+                      {companyHistory.map((code) => {
+                        const c = data?.companies.find((cc) => cc.code === code);
+                        return c ? (
+                          <div
+                            key={code}
+                            onClick={() => selectCompany(code)}
+                            style={{
+                              padding: "8px 12px",
+                              marginBottom: "4px",
+                              background: companyCode === code ? "#e7f0ff" : "white",
+                              border: companyCode === code ? "2px solid #007bff" : "1px solid #ddd",
+                              borderRadius: "4px",
+                              cursor: "pointer",
+                            }}
+                            onMouseEnter={(e) => (e.currentTarget.style.background = "#f5f5f5")}
+                            onMouseLeave={(e) =>
+                              (e.currentTarget.style.background = companyCode === code ? "#e7f0ff" : "white")
+                            }
+                          >
+                            {c.name}
+                            {c.hasPrice ? "" : "（単価未登録）"}
+                          </div>
+                        ) : null;
+                      })}
+                      <hr style={{ margin: "12px 0", borderColor: "#eee" }} />
+                    </>
+                  )}
+                  <div style={{ fontSize: "12px", color: "#666", marginBottom: "8px", fontWeight: "bold" }}>すべての会社</div>
+                  {data?.companies.map((c) => (
+                    <div
+                      key={c.code}
+                      onClick={() => selectCompany(c.code)}
+                      style={{
+                        padding: "8px 12px",
+                        marginBottom: "4px",
+                        background: companyCode === c.code ? "#e7f0ff" : "white",
+                        border: companyCode === c.code ? "2px solid #007bff" : "1px solid #ddd",
+                        borderRadius: "4px",
+                        cursor: "pointer",
+                      }}
+                      onMouseEnter={(e) => (e.currentTarget.style.background = "#f5f5f5")}
+                      onMouseLeave={(e) =>
+                        (e.currentTarget.style.background = companyCode === c.code ? "#e7f0ff" : "white")
+                      }
+                    >
+                      {c.name}
+                      {c.hasPrice ? "" : "（単価未登録）"}
+                    </div>
+                  ))}
+                </div>
+              </label>
+            ) : (
+              <label className="field">
+                <span>会社（単価表の会社）</span>
+                <div style={{ position: "relative" }}>
+                  <input
+                    type="text"
+                    placeholder="会社名で検索..."
+                    value={
+                      companySearch !== undefined
+                        ? companySearch
+                        : data?.companies.find((c) => c.code === companyCode)
+                            ?.name || ""
+                    }
+                    onChange={(e) => {
+                      setCompanySearch(e.target.value);
+                      const match = data?.companies.find(
+                        (c) =>
+                          c.name.toLowerCase() ===
+                          e.target.value.toLowerCase()
+                      );
+                      if (match) selectCompany(match.code);
+                    }}
+                    onFocus={() => setShowCompanyList(true)}
+                    onBlur={() => setTimeout(() => setShowCompanyList(false), 200)}
                     style={{
-                      position: "absolute",
-                      top: "100%",
-                      left: 0,
-                      right: 0,
-                      marginTop: "4px",
-                      background: "white",
+                      width: "100%",
+                      padding: "8px",
                       border: "1px solid #ccc",
                       borderRadius: "4px",
-                      maxHeight: "200px",
-                      overflowY: "auto",
-                      zIndex: 10,
-                      boxShadow: "0 2px 4px rgba(0,0,0,0.1)",
+                      fontSize: "14px",
                     }}
-                  >
-                    {data.companies
-                      .filter((c) =>
+                  />
+                  {showCompanyList && companySearch !== undefined && (
+                    <div
+                      style={{
+                        position: "absolute",
+                        top: "100%",
+                        left: 0,
+                        right: 0,
+                        marginTop: "4px",
+                        background: "white",
+                        border: "1px solid #ccc",
+                        borderRadius: "4px",
+                        maxHeight: "200px",
+                        overflowY: "auto",
+                        zIndex: 10,
+                        boxShadow: "0 2px 4px rgba(0,0,0,0.1)",
+                      }}
+                    >
+                      {data?.companies
+                        .filter((c) =>
+                          c.name
+                            .toLowerCase()
+                            .includes(companySearch.toLowerCase())
+                        )
+                        .map((c) => (
+                          <div
+                            key={c.code}
+                            onClick={() => selectCompany(c.code)}
+                            style={{
+                              padding: "8px 12px",
+                              cursor: "pointer",
+                              borderBottom: "1px solid #eee",
+                              fontSize: "14px",
+                            }}
+                            onMouseEnter={(e) =>
+                              (e.currentTarget.style.background = "#f5f5f5")
+                            }
+                            onMouseLeave={(e) =>
+                              (e.currentTarget.style.background = "white")
+                            }
+                          >
+                            {c.name}
+                            {c.hasPrice ? "" : "（単価未登録）"}
+                          </div>
+                        ))}
+                      {data?.companies.filter((c) =>
                         c.name
                           .toLowerCase()
                           .includes(companySearch.toLowerCase())
-                      )
-                      .map((c) => (
+                      ).length === 0 && (
                         <div
-                          key={c.code}
-                          onClick={() => {
-                            setCompanyCode(c.code);
-                            setCompanySearch(undefined);
-                            setShowCompanyList(false);
-                          }}
                           style={{
                             padding: "8px 12px",
-                            cursor: "pointer",
-                            borderBottom: "1px solid #eee",
+                            color: "#999",
                             fontSize: "14px",
                           }}
-                          onMouseEnter={(e) =>
-                            (e.currentTarget.style.background = "#f5f5f5")
-                          }
-                          onMouseLeave={(e) =>
-                            (e.currentTarget.style.background = "white")
-                          }
                         >
-                          {c.name}
-                          {c.hasPrice ? "" : "（単価未登録）"}
+                          該当する会社がありません
                         </div>
-                      ))}
-                    {data.companies.filter((c) =>
-                      c.name
-                        .toLowerCase()
-                        .includes(companySearch.toLowerCase())
-                    ).length === 0 && (
-                      <div
-                        style={{
-                          padding: "8px 12px",
-                          color: "#999",
-                          fontSize: "14px",
-                        }}
-                      >
-                        該当する会社がありません
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-            </label>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </label>
+            )}
             {company && !company.hasPrice && (
               <p className="muted">
                 この会社はまだ単価が登録されていません。区分を選んでも0円になります。
