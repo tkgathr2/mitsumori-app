@@ -97,12 +97,36 @@ async function tryFetchLive(): Promise<Company[] | null> {
   return tryFetchViaPublicCsv();
 }
 
-// 単価データを返す。ライブ取得を試し、失敗時はスナップショットにフォールバック。
+// DB（単価マスタ）に生きている会社があれば、そこを最優先のデータ源にする。
+// 管理画面 /admin で編集した単価をそのまま見積画面へ反映するための経路。
+async function tryFetchFromAdminDb(): Promise<Company[] | null> {
+  if (!process.env.DATABASE_URL) return null;
+  try {
+    const { hasActiveCompanies, loadCompaniesForPriceData } = await import(
+      "./price-admin-db"
+    );
+    if (!(await hasActiveCompanies())) return null;
+    const companies = await loadCompaniesForPriceData();
+    return companies.length > 0 ? companies : null;
+  } catch {
+    return null;
+  }
+}
+
+// 単価データを返す。①管理DB → ②ライブ取得（シート等）→ ③スナップショット。
 export async function getPriceData(): Promise<PriceData> {
   if (cache && Date.now() - cache.at < CACHE_MS) return cache.data;
 
-  const live = await tryFetchLive();
   let data: PriceData;
+  const fromDb = await tryFetchFromAdminDb();
+  if (fromDb && fromDb.length) {
+    const base = snapshotData(true);
+    data = { ...base, source: "DB (price_companies)", companies: fromDb };
+    cache = { data, at: Date.now() };
+    return data;
+  }
+
+  const live = await tryFetchLive();
   if (live && live.length) {
     const base = snapshotData(true);
     data = { ...base, companies: live };
