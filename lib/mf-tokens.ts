@@ -1,9 +1,19 @@
-import "server-only";
 import { Pool } from "pg";
 
-// MoneyForward OAuth token を Railway Postgres に保存する層。
-// lib/price-admin-db.ts と同じ作法（Pool使い回し・CREATE TABLE IF NOT EXISTS・
-// 非破壊）を踏襲する。DROP系migrationは行わない。
+// MF OAuth トークンの永続化層（Railway Postgres）。
+// - DATABASE_URL があれば mf_oauth_tokens テーブルに client_code='default' で1件保存
+// - DBが無い/未保存の場合は MF_REFRESH_TOKEN 環境変数をブートストラップ値として返す
+// lib/price-admin-db.ts と同じ作法（Pool使い回し・CREATE TABLE IF NOT EXISTS・非破壊）。
+// DROP系migrationは行わない。
+
+export interface MfTokenRecord {
+  access_token: string;
+  refresh_token: string;
+  access_expires_at: number; // epoch ms（0=期限切れ扱い→必ずrefreshが走る）
+  updated_at: number; // epoch ms
+}
+
+const CLIENT_CODE = "default";
 
 let _pool: Pool | null = null;
 function getPool(): Pool {
@@ -33,7 +43,7 @@ async function ensureSchema(): Promise<void> {
            updated_at    timestamptz DEFAULT NOW()
          )`
       );
-      // client_codeごとに最新のトークン1件を保つ想定のUNIQUE制約。
+      // client_codeごとに最新のトークン1件を保つUNIQUE制約。
       await pool.query(
         `CREATE UNIQUE INDEX IF NOT EXISTS mf_oauth_tokens_client_code_unique
            ON mf_oauth_tokens(client_code)`
@@ -46,106 +56,65 @@ async function ensureSchema(): Promise<void> {
   return _schemaReady;
 }
 
-function dbConfigured(): boolean {
+export function isDbConfigured(): boolean {
   return Boolean(process.env.DATABASE_URL);
 }
 
-export interface MFTokenRow {
-  id: number;
-  client_code: string;
-  access_token: string;
-  refresh_token: string;
-  expires_at: string;
-  created_at: string;
-  updated_at: string;
+// 後方互換: 「永続化ストレージが構成済みか」を返す（旧名のまま参照している箇所用）
+export function isKvConfigured(): boolean {
+  return isDbConfigured();
 }
 
 /**
- * MF OAuth token を保存（同一 client_code は上書き）。
- * expiresIn は秒単位（token エンドポイントの expires_in をそのまま渡す）。
+ * 保存済みトークンを読む。DB→envブートストラップの順で解決し、どちらも無ければ null。
  */
-export async function saveMFToken(
-  clientCode: string,
-  accessToken: string,
-  refreshToken: string,
-  expiresIn: number
-): Promise<MFTokenRow> {
+export async function loadTokens(): Promise<MfTokenRecord | null> {
+  if (isDbConfigured()) {
+    await ensureSchema();
+    const res = await getPool().query(
+      `SELECT access_token, refresh_token, expires_at, updated_at
+         FROM mf_oauth_tokens
+        WHERE client_code = $1`,
+      [CLIENT_CODE]
+    );
+    const row = res.rows[0];
+    if (row) {
+      return {
+        access_token: row.access_token,
+        refresh_token: row.refresh_token,
+        access_expires_at: new Date(row.expires_at).getTime(),
+        updated_at: new Date(row.updated_at).getTime(),
+      };
+    }
+  }
+  // DB未構成/未保存でも、MF_REFRESH_TOKEN があればそれを種にできる
+  const seed = process.env.MF_REFRESH_TOKEN;
+  if (seed) {
+    return {
+      access_token: "",
+      refresh_token: seed,
+      access_expires_at: 0,
+      updated_at: 0,
+    };
+  }
+  return null;
+}
+
+/**
+ * トークンを保存（client_code='default' を上書き）。
+ * DBが無い環境では何もしない（呼び出し元が refresh_token を運用者へ提示する）。
+ */
+export async function saveTokens(rec: MfTokenRecord): Promise<void> {
+  if (!isDbConfigured()) return;
   await ensureSchema();
-  const pool = getPool();
-  const res = await pool.query<MFTokenRow>(
+  await getPool().query(
     `INSERT INTO mf_oauth_tokens (client_code, access_token, refresh_token, expires_at, updated_at)
-     VALUES ($1, $2, $3, NOW() + ($4 || ' seconds')::interval, NOW())
+     VALUES ($1, $2, $3, to_timestamp($4 / 1000.0), NOW())
      ON CONFLICT (client_code) DO UPDATE
        SET access_token = $2,
            refresh_token = $3,
-           expires_at = NOW() + ($4 || ' seconds')::interval,
-           updated_at = NOW()
-     RETURNING id, client_code, access_token, refresh_token, expires_at, created_at, updated_at`,
-    [clientCode, accessToken, refreshToken, expiresIn]
+           expires_at = to_timestamp($4 / 1000.0),
+           updated_at = NOW()`,
+    [CLIENT_CODE, rec.access_token, rec.refresh_token, rec.access_expires_at]
   );
-  return res.rows[0];
-}
-
-/**
- * client_code に紐づく MF token を取得。無ければ null。
- */
-export async function getMFToken(clientCode: string): Promise<MFTokenRow | null> {
-  if (!dbConfigured()) return null;
-  await ensureSchema();
-  const res = await getPool().query<MFTokenRow>(
-    `SELECT id, client_code, access_token, refresh_token, expires_at, created_at, updated_at
-       FROM mf_oauth_tokens
-      WHERE client_code = $1`,
-    [clientCode]
-  );
-  return res.rows[0] || null;
-}
-
-export interface RefreshedToken {
-  accessToken: string;
-  refreshToken: string;
-  expiresIn: number;
-}
-
-/**
- * refresh_token を使って MF token エンドポイントから新しい access_token を取得する。
- * MF_CLIENT_SECRET が未設定の場合は実行時にエラーを投げる（実装は進めるが実行時エラーは許容）。
- */
-export async function refreshAccessToken(refreshToken: string): Promise<RefreshedToken> {
-  const clientId = process.env.MF_CLIENT_ID;
-  const clientSecret = process.env.MF_CLIENT_SECRET;
-  if (!clientId || !clientSecret) {
-    throw new Error(
-      "MF_CLIENT_ID / MF_CLIENT_SECRET が未設定です。社長からのClient Secret受領後、環境変数を設定してください。"
-    );
-  }
-
-  const tokenUrl = "https://app.moneyforward.com/oauth/token";
-  const res = await fetch(tokenUrl, {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: new URLSearchParams({
-      grant_type: "refresh_token",
-      refresh_token: refreshToken,
-      client_id: clientId,
-      client_secret: clientSecret,
-    }).toString(),
-  });
-
-  if (!res.ok) {
-    const detail = await res.text().catch(() => "");
-    throw new Error(`MF token refresh failed: ${res.status} ${detail}`);
-  }
-
-  const json = (await res.json()) as {
-    access_token: string;
-    refresh_token: string;
-    expires_in: number;
-  };
-
-  return {
-    accessToken: json.access_token,
-    refreshToken: json.refresh_token,
-    expiresIn: json.expires_in,
-  };
 }

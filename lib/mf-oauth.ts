@@ -33,7 +33,7 @@ export function getOAuthConfig(): MfOAuthConfig {
   // 明示設定が無ければ実行中のホストから推測（本番/localhost両対応）
   const redirectUri =
     process.env.MF_REDIRECT_URI ||
-    "https://mitsumori-app-pied.vercel.app/api/mf-callback";
+    "https://mitsumori.takagi.bz/api/mf-callback";
   return { clientId, clientSecret, redirectUri };
 }
 
