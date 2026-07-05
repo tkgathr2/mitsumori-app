@@ -83,6 +83,8 @@ export default function Page() {
   const [toast, setToast] = useState<string | null>(null);
   const [editingPriceId, setEditingPriceId] = useState<number | null>(null);
   const [pastQuotes, setPastQuotes] = useState<PastQuote[]>([]);
+  const [savingQuote, setSavingQuote] = useState(false);
+  const [sendingToMf, setSendingToMf] = useState(false);
 
   // localStorage から会社履歴を読込
   useEffect(() => {
@@ -147,6 +149,9 @@ export default function Page() {
   // 現在の明細を履歴として保存（同一内容はサーバー側で1種類に集約）
   async function saveCurrentQuote(silent = false): Promise<void> {
     if (!companyCode) return;
+    // ダブルサブミット防止：保存処理が実行中なら再入を弾く。
+    if (savingQuote) return;
+    setSavingQuote(true);
     const cleanRows = rows.map(({ id: _drop, ...rest }) => rest);
     try {
       const res = await fetch("/api/quotes", {
@@ -176,6 +181,8 @@ export default function Page() {
         setToast("履歴の保存に失敗しました（通信エラー）");
         setTimeout(() => setToast(null), 4000);
       }
+    } finally {
+      setSavingQuote(false);
     }
   }
 
@@ -239,11 +246,22 @@ export default function Page() {
   function update(id: number, patch: Partial<Row>) {
     setRows((rs) => rs.map((r) => (r.id === id ? { ...r, ...patch } : r)));
   }
+
+  // 数値入力（人数・日数・数量など）を 0〜999 の範囲に正規化する。
+  // 負数・NaN・過大値の入力を弾き、明細の暴走的な金額計算を防ぐ。
+  function clampNumericInput(value: string): string {
+    const n = Number(value);
+    if (!Number.isFinite(n)) return "0";
+    return String(Math.min(999, Math.max(0, n)));
+  }
   function remove(id: number) {
     setRows((rs) => (rs.length > 1 ? rs.filter((r) => r.id !== id) : rs));
   }
 
   async function onMfClick() {
+    // ダブルサブミット防止：MF送信中の再クリックを弾く（重複請求書作成を防ぐ）。
+    if (sendingToMf) return;
+    setSendingToMf(true);
     setToast("MFに見積書を作成中…");
     try {
       const res = await fetch("/api/mf-quote", {
@@ -265,6 +283,8 @@ export default function Page() {
       if (j.ok) void saveCurrentQuote(true);
     } catch (e) {
       setToast("通信エラー: " + String(e));
+    } finally {
+      setSendingToMf(false);
     }
     setTimeout(() => setToast(null), 8000);
   }
@@ -589,7 +609,7 @@ export default function Page() {
                               inputMode="numeric"
                               value={row.qty}
                               onChange={(e) =>
-                                update(row.id, { qty: e.target.value })
+                                update(row.id, { qty: clampNumericInput(e.target.value) })
                               }
                             />
                           </label>
@@ -644,7 +664,7 @@ export default function Page() {
                                 inputMode="numeric"
                                 value={row.people}
                                 onChange={(e) =>
-                                  update(row.id, { people: e.target.value })
+                                  update(row.id, { people: clampNumericInput(e.target.value) })
                                 }
                               />
                             </label>
@@ -657,7 +677,7 @@ export default function Page() {
                                   inputMode="numeric"
                                   value={row.people}
                                   onChange={(e) =>
-                                    update(row.id, { people: e.target.value })
+                                    update(row.id, { people: clampNumericInput(e.target.value) })
                                   }
                                 />
                               </label>
@@ -668,7 +688,7 @@ export default function Page() {
                                   inputMode="numeric"
                                   value={row.days}
                                   onChange={(e) =>
-                                    update(row.id, { days: e.target.value })
+                                    update(row.id, { days: clampNumericInput(e.target.value) })
                                   }
                                 />
                               </label>
@@ -770,8 +790,13 @@ export default function Page() {
               <span>{yen(totals.total)}</span>
             </div>
             <div style={{ marginTop: 16 }}>
-              <button className="primary" style={{ width: "100%" }} onClick={onMfClick}>
-                MFに見積を作成
+              <button
+                className="primary"
+                style={{ width: "100%", opacity: sendingToMf ? 0.7 : 1 }}
+                onClick={onMfClick}
+                disabled={sendingToMf}
+              >
+                {sendingToMf ? "作成中…" : "MFに見積を作成"}
               </button>
               <p className="muted" style={{ marginTop: 8 }}>
                 ※ 押すとMFクラウド請求書に見積書を作成し、PDFを開きます。
@@ -786,13 +811,15 @@ export default function Page() {
                   color: "#3b82f6",
                   border: "1px solid #3b82f6",
                   borderRadius: 6,
-                  cursor: "pointer",
+                  cursor: savingQuote ? "default" : "pointer",
                   fontSize: 14,
                   fontWeight: 600,
+                  opacity: savingQuote ? 0.7 : 1,
                 }}
                 onClick={() => void saveCurrentQuote()}
+                disabled={savingQuote}
               >
-                この見積を履歴に保存
+                {savingQuote ? "保存中…" : "この見積を履歴に保存"}
               </button>
               <p className="muted" style={{ marginTop: 8 }}>
                 ※ 保存すると、次回この会社を選んだとき「過去の見積」から呼び出せます。
