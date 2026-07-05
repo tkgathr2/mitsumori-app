@@ -106,6 +106,8 @@ export async function exchangeCodeForTokens(
       Authorization: basicAuthHeader(clientId, clientSecret),
     },
     body: body.toString(),
+    // ネットワークが応答しないときに無限待ちしないよう15秒でタイムアウト。
+    signal: AbortSignal.timeout(15000),
   });
   if (!res.ok) {
     const text = await res.text().catch(() => "");
@@ -136,6 +138,8 @@ export async function refreshTokens(
       Authorization: basicAuthHeader(clientId, clientSecret),
     },
     body: body.toString(),
+    // ネットワークが応答しないときに無限待ちしないよう15秒でタイムアウト。
+    signal: AbortSignal.timeout(15000),
   });
   if (!res.ok) {
     const text = await res.text().catch(() => "");

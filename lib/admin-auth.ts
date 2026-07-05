@@ -27,7 +27,7 @@ export function adminPasswordConfigured(
 }
 
 // 定数時間比較（長さが違えば false）。分岐タイミングを値内容に依存させない。
-function timingSafeEqualStr(a: string, b: string): boolean {
+export function timingSafeEqualStr(a: string, b: string): boolean {
   if (a.length !== b.length) return false;
   let diff = 0;
   for (let i = 0; i < a.length; i++) {

@@ -5,7 +5,7 @@ import {
 } from "@/lib/prices";
 import { parseSeedCsv, parseSeedJson, type SeedCompany } from "@/lib/seed-parse";
 import { upsertCompanyWithRates } from "@/lib/price-admin-db";
-import { ADMIN_COOKIE, verifySessionToken } from "@/lib/admin-auth";
+import { ADMIN_COOKIE, verifySessionToken, timingSafeEqualStr } from "@/lib/admin-auth";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -31,7 +31,8 @@ async function authorized(req: NextRequest): Promise<boolean> {
     process.env.ADMIN_PASSWORD,
     process.env.PRICE_SYNC_SECRET,
   ].filter((v): v is string => Boolean(v && v.trim()));
-  return candidates.includes(key);
+  // タイミング攻撃対策：平文の一致（includes）ではなく定数時間比較で照合する。
+  return candidates.some((c) => timingSafeEqualStr(key, c));
 }
 
 // ① 公開export CSV（新シートが公開共有されていれば成功）。

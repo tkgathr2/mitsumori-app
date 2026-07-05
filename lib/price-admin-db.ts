@@ -443,6 +443,17 @@ export async function saveQuote(
   };
 }
 
+// 指定 code の「生きている会社」が存在するか軽量チェックする（見積保存前の検証用）。
+export async function companyExists(companyCode: string): Promise<boolean> {
+  if (!isDbConfigured()) return false;
+  await ensureSchema();
+  const res = await getPool().query(
+    `SELECT 1 FROM price_companies WHERE code = $1 AND deleted_at IS NULL LIMIT 1`,
+    [companyCode]
+  );
+  return (res.rowCount ?? 0) > 0;
+}
+
 // 直近の見積を「種類」単位で最大 limit 件（同じ data_hash は最新1件に集約）
 export async function listQuotesByCompany(companyCode: string, limit = 5): Promise<QuoteRow[]> {
   if (!isDbConfigured()) return [];

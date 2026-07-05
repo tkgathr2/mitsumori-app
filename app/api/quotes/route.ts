@@ -1,8 +1,12 @@
 import { type NextRequest, NextResponse } from "next/server";
-import { saveQuote, listQuotesByCompany } from "@/lib/price-admin-db";
+import { saveQuote, listQuotesByCompany, companyExists } from "@/lib/price-admin-db";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+
+// quoteData の肥大化でDBを圧迫しないためのガード。
+const MAX_QUOTE_DATA_BYTES = 65536; // 64KB
+const MAX_QUOTE_LINES = 50;
 
 // GET /api/quotes?company=<code> … その会社の過去見積（直近5種類）
 export async function GET(req: NextRequest): Promise<NextResponse> {
@@ -35,6 +39,30 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       { status: 400 }
     );
   }
+
+  // (a) quoteData のJSONサイズが上限を超えたら拒否
+  const quoteDataBytes = Buffer.byteLength(JSON.stringify(body.quoteData), "utf8");
+  if (quoteDataBytes > MAX_QUOTE_DATA_BYTES) {
+    return NextResponse.json(
+      { error: `quoteData が大きすぎます（上限 ${MAX_QUOTE_DATA_BYTES} バイト）` },
+      { status: 400 }
+    );
+  }
+
+  // (b) 明細行数（quoteData.rows）が上限を超えたら拒否
+  const rows = (body.quoteData as { rows?: unknown }).rows;
+  if (Array.isArray(rows) && rows.length > MAX_QUOTE_LINES) {
+    return NextResponse.json(
+      { error: `明細行数が多すぎます（上限 ${MAX_QUOTE_LINES} 行）` },
+      { status: 400 }
+    );
+  }
+
+  // (c) companyCode が実在する会社か検証
+  if (!(await companyExists(body.companyCode))) {
+    return NextResponse.json({ error: "会社が見つかりません" }, { status: 404 });
+  }
+
   try {
     const quote = await saveQuote(body.companyCode, body.name ?? "", body.quoteData);
     return NextResponse.json({ ok: true, quote });
