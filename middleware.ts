@@ -8,7 +8,7 @@ import { ADMIN_COOKIE, verifySessionToken } from "@/lib/admin-auth";
 
 async function isAuthed(req: NextRequest): Promise<boolean> {
   const token = req.cookies.get(ADMIN_COOKIE)?.value;
-  return verifySessionToken(token);
+  return (await verifySessionToken(token)) !== null;
 }
 
 export async function middleware(req: NextRequest): Promise<NextResponse> {

@@ -831,6 +831,9 @@ export default function Page() {
 
       <footer className="foot">
         <p>
+          <a href="/admin">🔧 管理画面（単価マスタの確認・編集）</a>
+        </p>
+        <p>
           使いづらい / こうしてほしい →{" "}
           <a
             href="https://kaizen.takagi.bz/?sys=mitsumori"

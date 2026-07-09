@@ -26,6 +26,13 @@ const RATE_LABEL: Record<string, string> = Object.fromEntries(
   RATE_DEFS.map((d) => [d.key, d.label])
 );
 
+// 変更履歴の changed_by（ログインユーザー名）の表示名
+const USER_LABEL: Record<string, string> = {
+  takagi: "高木 社長",
+  nishimura: "西村さん",
+  admin: "admin",
+};
+
 function yen(n: number | null): string {
   if (n === null || n === undefined) return "—";
   return n.toLocaleString("ja-JP");
@@ -357,7 +364,7 @@ export default function AdminPage() {
                         {" → "}
                         <span className="new">{yen(h.newPrice)}</span>
                       </td>
-                      <td>{h.changedBy}</td>
+                      <td>{USER_LABEL[h.changedBy] || h.changedBy}</td>
                     </tr>
                   ))}
                 </tbody>

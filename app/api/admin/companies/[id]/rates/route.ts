@@ -1,4 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server";
+import { ADMIN_COOKIE, verifySessionToken } from "@/lib/admin-auth";
 import { updateRate } from "@/lib/price-admin-db";
 
 export const runtime = "nodejs";
@@ -36,8 +37,11 @@ export async function PATCH(
       { status: 400 }
     );
   }
+  // 変更履歴 changed_by 用にログインユーザー名を取る（認証自体は middleware 済み）。
+  const changedBy =
+    (await verifySessionToken(req.cookies.get(ADMIN_COOKIE)?.value)) ?? "admin";
   try {
-    await updateRate(companyId, rateKey, Math.round(price));
+    await updateRate(companyId, rateKey, Math.round(price), changedBy);
     return NextResponse.json({ ok: true });
   } catch (e) {
     return NextResponse.json(

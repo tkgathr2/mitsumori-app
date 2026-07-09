@@ -2,7 +2,14 @@
 
 import { useState } from "react";
 
+// 管理ユーザー（サーバ側の ADMIN_USERS_JSON と対応）
+const USERS = [
+  { value: "takagi", label: "高木 社長" },
+  { value: "nishimura", label: "西村さん" },
+] as const;
+
 export default function AdminLoginPage() {
+  const [user, setUser] = useState<string>(USERS[0].value);
   const [password, setPassword] = useState("");
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState(false);
@@ -15,7 +22,7 @@ export default function AdminLoginPage() {
       const res = await fetch("/api/admin/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ password }),
+        body: JSON.stringify({ user, password }),
       });
       if (res.ok) {
         window.location.href = "/admin";
@@ -37,6 +44,16 @@ export default function AdminLoginPage() {
       </header>
       <div className="card" style={{ maxWidth: 420, margin: "24px auto" }}>
         <form onSubmit={submit}>
+          <label className="field">
+            <span>ユーザー</span>
+            <select value={user} onChange={(e) => setUser(e.target.value)}>
+              {USERS.map((u) => (
+                <option key={u.value} value={u.value}>
+                  {u.label}
+                </option>
+              ))}
+            </select>
+          </label>
           <label className="field">
             <span>管理パスワード</span>
             <input
