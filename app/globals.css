@@ -66,6 +66,28 @@ header.hero p {
   background: #fff;
   white-space: nowrap;
 }
+
+.admin-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  padding: 6px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: #fff;
+  color: #334155;
+  text-decoration: none;
+  white-space: nowrap;
+  transition: background 0.15s, border-color 0.15s;
+}
+.admin-link:hover {
+  background: #f1f5f9;
+  border-color: #94a3b8;
+}
+.admin-link svg {
+  flex-shrink: 0;
+}
 .sync-badge.live {
   color: var(--ok);
   border-color: #a7f3d0;
