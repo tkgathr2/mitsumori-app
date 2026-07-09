@@ -102,39 +102,11 @@ function LoginForm() {
           Google でログイン
         </button>
 
-        <div style={{ textAlign: "center", margin: "16px 0", fontSize: "13px", color: "#999" }}>
-          または
-        </div>
-
-        <form onSubmit={submit}>
-          <label className="field">
-            <span>ユーザー</span>
-            <select value={user} onChange={(e) => setUser(e.target.value)}>
-              {USERS.map((u) => (
-                <option key={u.value} value={u.value}>
-                  {u.label}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="field">
-            <span>管理パスワード</span>
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              autoComplete="current-password"
-            />
-          </label>
-          {err && (
-            <p style={{ color: "var(--danger)", fontSize: 13, margin: "0 0 12px" }}>
-              {err}
-            </p>
-          )}
-          <button type="submit" className="primary" disabled={busy} style={{ width: "100%" }}>
-            {busy ? "確認中…" : "ログイン"}
-          </button>
-        </form>
+        {err && (
+          <p style={{ color: "var(--danger)", fontSize: 13, margin: "12px 0 0", textAlign: "center" }}>
+            {err}
+          </p>
+        )}
       </div>
       <footer className="foot">
         <a href="/">見積もり画面へ戻る</a>
