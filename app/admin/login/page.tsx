@@ -1,5 +1,6 @@
 "use client";
 
+import { Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 
@@ -9,7 +10,7 @@ const USERS = [
   { value: "nishimura", label: "西村さん" },
 ] as const;
 
-export default function AdminLoginPage() {
+function LoginForm() {
   const searchParams = useSearchParams();
   const [user, setUser] = useState<string>(USERS[0].value);
   const [password, setPassword] = useState("");
@@ -139,5 +140,13 @@ export default function AdminLoginPage() {
         <a href="/">見積もり画面へ戻る</a>
       </footer>
     </div>
+  );
+}
+
+export default function AdminLoginPage() {
+  return (
+    <Suspense fallback={<div className="wrap"><div className="loading">読み込み中…</div></div>}>
+      <LoginForm />
+    </Suspense>
   );
 }
