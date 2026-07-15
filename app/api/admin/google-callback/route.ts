@@ -150,7 +150,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
       console.error("unverified_email:", { email: userInfo.email, email_verified: userInfo.email_verified });
       return NextResponse.redirect(
         new URL(
-          `${loginPage}?error=${encodeURIComponent(`unverified_email: ${userInfo.email ?? "(email無し)"}`)}`,
+          `${loginPage}?error=${encodeURIComponent("メールアドレスが確認できませんでした")}`,
           appOrigin(req)
         )
       );
