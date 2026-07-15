@@ -321,16 +321,29 @@ footer.foot a {
   border-radius: 12px;
   background: #fff;
 }
+/* border-collapse:collapse だと sticky セルの枠線が一緒にスクロールして消えるため、
+   separate + セルごとの右下border で描く（外周は .matrix-scroll の枠が担当）。 */
 table.matrix {
-  border-collapse: collapse;
+  border-collapse: separate;
+  border-spacing: 0;
   font-size: 13px;
   min-width: 100%;
 }
 table.matrix th,
 table.matrix td {
-  border: 1px solid var(--line);
+  border-right: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
   padding: 6px 8px;
+  /* 数値・区分名を折り返さない。会社セルだけ下で解除する。 */
   white-space: nowrap;
+  background: #fff;
+  vertical-align: top;
+}
+table.matrix tr > :last-child {
+  border-right: 0;
+}
+table.matrix tbody tr:last-child > * {
+  border-bottom: 0;
 }
 table.matrix thead th {
   background: var(--brand-soft);
@@ -338,24 +351,59 @@ table.matrix thead th {
   top: 0;
   font-weight: 700;
   text-align: center;
+  vertical-align: bottom;
   z-index: 1;
+  padding: 0;
 }
 table.matrix th.company-col {
   position: sticky;
   left: 0;
-  background: #fff;
   text-align: left;
-  min-width: 200px;
+  /* 実データの最長社名（例：株式会社マルニコーポレーション＝15文字）が
+     切れずに収まる幅。狭めると入力欄の中で社名が途切れる。 */
+  min-width: 260px;
+  width: 260px;
   z-index: 2;
+  /* ← 崩れの原因。会社セルの中身（input×2＋div）を確実に縦積みにするため解除。 */
+  white-space: normal;
+  font-weight: 400;
 }
 table.matrix thead th.company-col {
-  background: var(--brand-soft);
   z-index: 3;
+}
+/* 会社名・備考・コードの縦積みを、inline/blockの混在に依存せず flex で保証する。 */
+table.matrix .company-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 4px;
+  min-width: 0;
+}
+table.matrix .company-cell input {
+  width: 100%;
+  min-width: 0;
+  font-size: 13px;
+  padding: 5px 7px;
+  border-radius: 7px;
+}
+table.matrix .company-name {
+  font-weight: 600;
+}
+table.matrix .company-note {
+  font-weight: 400;
+  color: var(--ink);
+}
+table.matrix .company-meta {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 400;
+  line-height: 1.4;
 }
 table.matrix td.price-cell {
   text-align: right;
   cursor: pointer;
   min-width: 90px;
+  vertical-align: middle;
 }
 table.matrix td.price-cell:hover {
   background: #f0f7ff;
@@ -366,12 +414,68 @@ table.matrix td.price-cell input {
   text-align: right;
   font-size: 13px;
 }
-table.matrix .company-name {
-  font-weight: 600;
+table.matrix tbody td:last-child {
+  vertical-align: middle;
 }
-table.matrix .company-meta {
+
+/* ---- 並び替えできる見出し ---- */
+/* th 全面を占めるボタン＝キーボードでも押せる。単価セルの編集開始（td の onClick）
+   とは要素が別なので衝突しない。 */
+table.matrix th.sortable {
+  padding: 0;
+}
+table.matrix .sort-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  width: 100%;
+  height: 100%;
+  padding: 6px 8px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-weight: 700;
+  text-align: center;
+  cursor: pointer;
+  transition: background 0.12s;
+}
+table.matrix th.company-col .sort-btn {
+  justify-content: flex-start;
+  text-align: left;
+  font-weight: 700;
+}
+table.matrix .sort-btn:hover {
+  background: #dbeafe;
+}
+table.matrix .sort-btn:focus-visible {
+  outline: 2px solid var(--brand-dark);
+  outline-offset: -2px;
+}
+table.matrix .sort-btn .unit {
+  font-weight: 400;
   color: var(--muted);
-  font-size: 11px;
+}
+table.matrix .sort-arrow {
+  flex: none;
+  font-size: 10px;
+  line-height: 1;
+  color: var(--muted);
+  opacity: 0.45;
+}
+table.matrix .sort-btn:hover .sort-arrow {
+  opacity: 0.8;
+}
+table.matrix .sort-arrow.active {
+  color: var(--brand-dark);
+  opacity: 1;
+}
+/* 並び替え中の列を薄く塗って一目で分かるようにする */
+table.matrix th[aria-sort="ascending"],
+table.matrix th[aria-sort="descending"] {
+  background: #dbeafe;
 }
 
 .admin-toolbar {

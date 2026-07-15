@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { RATE_DEFS, type RateKey } from "@/lib/prices";
 
 interface AdminCompany {
@@ -38,6 +38,33 @@ function yen(n: number | null): string {
   return n.toLocaleString("ja-JP");
 }
 
+// ---- 並び替え ----
+// 会社列（会社名→コードのタイブレーク）と、各単価列（数値）でソートできる。
+// 状態は「未ソート（＝サーバから来た sortOrder 順）→ 昇順 → 降順 → 未ソート」の3循環。
+type SortKey = "company" | RateKey;
+type SortDir = "asc" | "desc";
+interface SortState {
+  key: SortKey;
+  dir: SortDir;
+}
+
+// 会社名は日本語なので localeCompare("ja")。同名なら会社コードで決定的に並べる。
+function compareCompanyName(a: AdminCompany, b: AdminCompany): number {
+  const byName = a.name.localeCompare(b.name, "ja");
+  if (byName !== 0) return byName;
+  return a.code.localeCompare(b.code, "ja");
+}
+
+// 並び替えの状態表示。未ソート列は薄い「↕」で「押せる」ことを示す。
+function SortArrow({ active, dir }: { active: boolean; dir?: SortDir }) {
+  const mark = !active ? "↕" : dir === "asc" ? "▲" : "▼";
+  return (
+    <span className={active ? "sort-arrow active" : "sort-arrow"} aria-hidden="true">
+      {mark}
+    </span>
+  );
+}
+
 export default function AdminPage() {
   const [tab, setTab] = useState<"matrix" | "history">("matrix");
   const [companies, setCompanies] = useState<AdminCompany[]>([]);
@@ -55,6 +82,39 @@ export default function AdminPage() {
   const [newCode, setNewCode] = useState("");
   const [newName, setNewName] = useState("");
   const [newNote, setNewNote] = useState("");
+
+  // 並び替え（null = 既定＝サーバから来た sortOrder 順）
+  const [sort, setSort] = useState<SortState | null>(null);
+
+  // 昇順 → 降順 → 解除 のトグル。別の列を押したらその列の昇順から。
+  const toggleSort = useCallback((key: SortKey) => {
+    setSort((s) => {
+      if (!s || s.key !== key) return { key, dir: "asc" };
+      if (s.dir === "asc") return { key, dir: "desc" };
+      return null;
+    });
+  }, []);
+
+  // クライアント側ソート（会社数は数十件なのでAPIは変更しない）。
+  const sortedCompanies = useMemo(() => {
+    if (!sort) return companies; // 既定＝サーバ順をそのまま
+    const sign = sort.dir === "asc" ? 1 : -1;
+    return [...companies].sort((a, b) => {
+      if (sort.key === "company") return compareCompanyName(a, b) * sign;
+      // 単価は必ず数値（未設定は 0）。文字列比較にしない。
+      const av = a.prices[sort.key] ?? 0;
+      const bv = b.prices[sort.key] ?? 0;
+      if (av !== bv) return (av - bv) * sign;
+      // 同額どうしは会社名で安定させる（昇降で入れ替わらないよう sign を掛けない）
+      return compareCompanyName(a, b);
+    });
+  }, [companies, sort]);
+
+  // スクリーンリーダー向けの並び順（列ヘッダに付与）
+  const ariaSort = (key: SortKey): "ascending" | "descending" | "none" => {
+    if (sort?.key !== key) return "none";
+    return sort.dir === "asc" ? "ascending" : "descending";
+  };
 
   const flash = useCallback((msg: string) => {
     setToast(msg);
@@ -258,41 +318,66 @@ export default function AdminPage() {
               <table className="matrix">
                 <thead>
                   <tr>
-                    <th className="company-col">会社</th>
+                    <th
+                      className="company-col sortable"
+                      aria-sort={ariaSort("company")}
+                    >
+                      <button
+                        type="button"
+                        className="sort-btn"
+                        onClick={() => toggleSort("company")}
+                        title="会社名で並び替え"
+                      >
+                        <span className="sort-text">会社</span>
+                        <SortArrow active={sort?.key === "company"} dir={sort?.dir} />
+                      </button>
+                    </th>
                     {RATE_DEFS.map((d) => (
-                      <th key={d.key} title={d.label}>
-                        {d.label}
-                        <br />
-                        <span style={{ fontWeight: 400, color: "var(--muted)" }}>
-                          ({d.unit})
-                        </span>
+                      <th key={d.key} className="sortable" aria-sort={ariaSort(d.key)}>
+                        <button
+                          type="button"
+                          className="sort-btn"
+                          onClick={() => toggleSort(d.key)}
+                          title={`${d.label}（${d.unit}）で並び替え`}
+                        >
+                          <span className="sort-text">
+                            {d.label}
+                            <br />
+                            <span className="unit">({d.unit})</span>
+                          </span>
+                          <SortArrow active={sort?.key === d.key} dir={sort?.dir} />
+                        </button>
                       </th>
                     ))}
                     <th>操作</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {companies.map((c) => (
+                  {sortedCompanies.map((c) => (
                     <tr key={c.id}>
                       <th className="company-col">
-                        <input
-                          className="company-name"
-                          defaultValue={c.name}
-                          onBlur={(e) =>
-                            saveCompanyMeta(c, e.target.value.trim(), c.note)
-                          }
-                          style={{ width: "100%", marginBottom: 4 }}
-                        />
-                        <input
-                          className="company-meta"
-                          defaultValue={c.note}
-                          placeholder="備考"
-                          onBlur={(e) =>
-                            saveCompanyMeta(c, c.name, e.target.value.trim())
-                          }
-                          style={{ width: "100%" }}
-                        />
-                        <div className="company-meta">コード: {c.code || "—"}</div>
+                        {/* 会社名・備考・コードを確実に縦積みにする（flex column）。
+                            親セルの white-space:nowrap は .company-col 側で解除済み。 */}
+                        <div className="company-cell">
+                          <input
+                            className="company-name"
+                            defaultValue={c.name}
+                            aria-label="会社名"
+                            onBlur={(e) =>
+                              saveCompanyMeta(c, e.target.value.trim(), c.note)
+                            }
+                          />
+                          <input
+                            className="company-note"
+                            defaultValue={c.note}
+                            placeholder="備考"
+                            aria-label="備考"
+                            onBlur={(e) =>
+                              saveCompanyMeta(c, c.name, e.target.value.trim())
+                            }
+                          />
+                          <div className="company-meta">コード: {c.code || "—"}</div>
+                        </div>
                       </th>
                       {RATE_DEFS.map((d) => {
                         const isEd =
