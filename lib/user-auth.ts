@@ -12,16 +12,16 @@
 export const USER_COOKIE = "mitsumori_user";
 const SESSION_PAYLOAD_PREFIX = "user:v1:";
 
-function allowedDomains(env: NodeJS.ProcessEnv = process.env): string[] {
-  const raw = env.ALLOWED_EMAIL_DOMAINS;
-  const list = raw && raw.trim() ? raw.split(",") : ["takagi.bz", "stepupnext.com"];
-  return list.map((d) => d.trim().toLowerCase()).filter(Boolean);
+// 見積もり画面は「ドメインなら誰でも」ではなく、個別に許可されたメールのみ通す
+// （2026-07-15社長指示：高木・西村さんのみ。他は申請フローへ）。
+function allowedEmails(env: NodeJS.ProcessEnv = process.env): string[] {
+  const raw = env.ALLOWED_USER_EMAILS;
+  const list = raw && raw.trim() ? raw.split(",") : [];
+  return list.map((e) => e.trim().toLowerCase()).filter(Boolean);
 }
 
 export function isAllowedEmail(email: string, env: NodeJS.ProcessEnv = process.env): boolean {
-  const domain = email.toLowerCase().split("@").pop();
-  if (!domain) return false;
-  return allowedDomains(env).includes(domain);
+  return allowedEmails(env).includes(email.toLowerCase());
 }
 
 // セッションの有効期間（cookieのmaxAgeと揃える＝30日）。トークン自体にも

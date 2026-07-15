@@ -7,6 +7,7 @@ import {
   timingSafeEqualStr,
 } from "@/lib/admin-auth";
 import { USER_COOKIE, isAllowedEmail, makeUserSessionToken } from "@/lib/user-auth";
+import { recordAccessRequest, notifyAccessRequest } from "@/lib/access-requests-db";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -138,10 +139,12 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     let res: NextResponse;
 
     if (flow === "general") {
-      // 見積もり画面：ドメイン許可リストに載っていれば誰でもログイン可
+      // 見積もり画面：個別に許可されたメールのみログイン可。未許可は申請を記録して通知。
       if (!isAllowedEmail(email)) {
+        const isNew = await recordAccessRequest(email, "general");
+        if (isNew) await notifyAccessRequest(email, "general");
         return NextResponse.redirect(
-          new URL(`${loginPage}?error=${encodeURIComponent(`Email not authorized: ${email}`)}`, appOrigin(req))
+          new URL(`${loginPage}?requested=1&email=${encodeURIComponent(email)}`, appOrigin(req))
         );
       }
       const token = await makeUserSessionToken(email);
@@ -162,8 +165,10 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
       const user = emailsMap[email];
 
       if (!user || !adminUsers()[user]) {
+        const isNew = await recordAccessRequest(email, "admin");
+        if (isNew) await notifyAccessRequest(email, "admin");
         return NextResponse.redirect(
-          new URL(`${loginPage}?error=${encodeURIComponent(`Email not authorized: ${email}`)}`, appOrigin(req))
+          new URL(`${loginPage}?requested=1&email=${encodeURIComponent(email)}`, appOrigin(req))
         );
       }
 

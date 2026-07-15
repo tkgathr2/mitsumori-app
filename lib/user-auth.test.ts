@@ -6,19 +6,20 @@ import {
   timingSafeEqualStr,
 } from "./user-auth";
 
-const ENV = { USER_SESSION_SECRET: "sekret" } as unknown as NodeJS.ProcessEnv;
+const ENV = {
+  USER_SESSION_SECRET: "sekret",
+  ALLOWED_USER_EMAILS: "user@takagi.bz,west@stepupnext.com",
+} as unknown as NodeJS.ProcessEnv;
 
 describe("user-auth", () => {
-  it("ドメイン許可: 既定は takagi.bz / stepupnext.com", () => {
-    expect(isAllowedEmail("a@takagi.bz", {} as NodeJS.ProcessEnv)).toBe(true);
-    expect(isAllowedEmail("a@stepupnext.com", {} as NodeJS.ProcessEnv)).toBe(true);
-    expect(isAllowedEmail("a@evil.com", {} as NodeJS.ProcessEnv)).toBe(false);
+  it("個別許可: ALLOWED_USER_EMAILS に載っているメールだけ許可", () => {
+    expect(isAllowedEmail("user@takagi.bz", ENV)).toBe(true);
+    expect(isAllowedEmail("West@Stepupnext.com", ENV)).toBe(true); // 大文字小文字を無視
+    expect(isAllowedEmail("other@takagi.bz", ENV)).toBe(false); // 同ドメインでも未許可なら弾く
   });
 
-  it("ドメイン許可: @を複数含むメールでも末尾ドメインで判定する", () => {
-    // split("@")[1] だと "b" になり誤判定するケースの回帰テスト
-    expect(isAllowedEmail("a@b@takagi.bz", {} as NodeJS.ProcessEnv)).toBe(true);
-    expect(isAllowedEmail("a@b@evil.com", {} as NodeJS.ProcessEnv)).toBe(false);
+  it("個別許可: ALLOWED_USER_EMAILS 未設定なら誰も許可しない（安全側に倒す）", () => {
+    expect(isAllowedEmail("user@takagi.bz", {} as NodeJS.ProcessEnv)).toBe(false);
   });
 
   it("正しいトークンは検証を通り、メールを復元できる", async () => {
@@ -28,13 +29,13 @@ describe("user-auth", () => {
     expect(verified).toBe("user@takagi.bz");
   });
 
-  it("許可ドメイン外のメールはトークン発行されない", async () => {
-    const token = await makeUserSessionToken("user@evil.com", ENV);
+  it("許可リスト外のメールはトークン発行されない", async () => {
+    const token = await makeUserSessionToken("other@takagi.bz", ENV);
     expect(token).toBeNull();
   });
 
   it("secret未設定なら発行も検証も必ず失敗する（安全側フェイル）", async () => {
-    const token = await makeUserSessionToken("user@takagi.bz", {} as NodeJS.ProcessEnv);
+    const token = await makeUserSessionToken("user@takagi.bz", { ALLOWED_USER_EMAILS: "user@takagi.bz" } as unknown as NodeJS.ProcessEnv);
     expect(token).toBeNull();
     const verified = await verifyUserSessionToken("dummy.123.abc", {} as NodeJS.ProcessEnv);
     expect(verified).toBeNull();

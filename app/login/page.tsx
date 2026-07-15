@@ -7,9 +7,14 @@ import { useEffect, useState } from "react";
 function LoginForm() {
   const searchParams = useSearchParams();
   const [err, setErr] = useState("");
+  const [requested, setRequested] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
+    if (searchParams.get("requested") === "1") {
+      setRequested(searchParams.get("email") || "");
+      return;
+    }
     const errorParam = searchParams.get("error");
     if (errorParam) {
       setErr(errorParam);
@@ -74,8 +79,14 @@ function LoginForm() {
           Google でログイン
         </button>
         <p style={{ fontSize: 12, color: "#888", textAlign: "center", margin: "8px 0 0" }}>
-          社内アカウント（@takagi.bz / @stepupnext.com）でログインしてください
+          利用が許可されたアカウントでログインしてください
         </p>
+
+        {requested !== null && (
+          <p style={{ fontSize: 13, margin: "12px 0 0", textAlign: "center" }}>
+            利用申請を受け付けました{requested ? `（${requested}）` : ""}。担当者の承認をお待ちください。
+          </p>
+        )}
 
         {err && (
           <p style={{ color: "var(--danger)", fontSize: 13, margin: "12px 0 0", textAlign: "center" }}>
