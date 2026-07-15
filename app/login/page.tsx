@@ -7,12 +7,12 @@ import { useEffect, useState } from "react";
 function LoginForm() {
   const searchParams = useSearchParams();
   const [err, setErr] = useState("");
-  const [requested, setRequested] = useState<string | null>(null);
+  const [requested, setRequested] = useState(false);
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
     if (searchParams.get("requested") === "1") {
-      setRequested(searchParams.get("email") || "");
+      setRequested(true);
       return;
     }
     const errorParam = searchParams.get("error");
@@ -82,9 +82,9 @@ function LoginForm() {
           利用が許可されたアカウントでログインしてください
         </p>
 
-        {requested !== null && (
+        {requested && (
           <p style={{ fontSize: 13, margin: "12px 0 0", textAlign: "center" }}>
-            利用申請を受け付けました{requested ? `（${requested}）` : ""}。担当者の承認をお待ちください。
+            アクセス申請を受け付けました。管理者の承認をお待ちください。
           </p>
         )}
 

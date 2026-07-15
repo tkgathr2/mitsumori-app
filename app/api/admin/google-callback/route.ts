@@ -49,6 +49,36 @@ function appOrigin(req: NextRequest): string {
   return `${proto}://${host}`;
 }
 
+// PKCE / flow cookies は成功・失敗を問わず必ずクリアする。
+// oauth_state はワンショットのはずなので、失敗パスで残り続けると同一 state が
+// 有効期限（10分）内ずっと検証を通ってしまう。新しい return を足すたびに消し忘れる
+// リスクを減らすため、redirect 生成はすべてこのヘルパーを経由させる。
+export function redirectClearingOAuthCookies(url: string | URL): NextResponse {
+  const res = NextResponse.redirect(url);
+  res.cookies.delete("oauth_code_verifier");
+  res.cookies.delete("oauth_state");
+  res.cookies.delete("oauth_flow");
+  return res;
+}
+
+// 申請の記録(recordAccessRequest)と通知(notifyAccessRequest)を、それぞれ独立してtry/catchする。
+// どちらかがDB例外等で失敗しても、呼び出し元(GETハンドラの外側try/catch)まで例外を伝播させない。
+// 記録が失敗した場合は「新規かどうか」を判定できないが、通知漏れの方が実害が大きいため
+// 通知は試みる（＝isNew不明時はtrue扱い）。逆に通知が失敗しても記録の成否には影響しない。
+async function requestAccess(email: string, flow: "admin" | "general"): Promise<void> {
+  let isNew = true;
+  try {
+    isNew = await recordAccessRequest(email, flow);
+  } catch (e) {
+    console.error("recordAccessRequest failed:", e);
+  }
+  try {
+    if (isNew) await notifyAccessRequest(email, flow);
+  } catch (e) {
+    console.error("notifyAccessRequest failed:", e);
+  }
+}
+
 function getGoogleEmailsMap(env: NodeJS.ProcessEnv = process.env): Record<string, string> {
   const raw = env.ADMIN_GOOGLE_EMAILS_JSON;
   if (!raw || !raw.trim()) return {};
@@ -75,7 +105,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
   const loginPage = flow === "general" ? "/login" : "/admin/login";
 
   if (flow === "admin" && !adminConfigured()) {
-    return NextResponse.redirect(new URL(`${loginPage}?error=not_configured`, appOrigin(req)));
+    return redirectClearingOAuthCookies(new URL(`${loginPage}?error=not_configured`, appOrigin(req)));
   }
 
   const { searchParams } = new URL(req.url);
@@ -85,23 +115,23 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
 
   // ユーザーが認可キャンセルした場合
   if (error) {
-    return NextResponse.redirect(new URL(`${loginPage}?error=${encodeURIComponent(error)}`, appOrigin(req)));
+    return redirectClearingOAuthCookies(new URL(`${loginPage}?error=${encodeURIComponent(error)}`, appOrigin(req)));
   }
 
   if (!code) {
-    return NextResponse.redirect(new URL(`${loginPage}?error=missing_code`, appOrigin(req)));
+    return redirectClearingOAuthCookies(new URL(`${loginPage}?error=missing_code`, appOrigin(req)));
   }
 
   // state 検証（CSRF 対策）
   const storedState = req.cookies.get("oauth_state")?.value;
   if (!state || !storedState || !timingSafeEqualStr(state, storedState)) {
-    return NextResponse.redirect(new URL(`${loginPage}?error=invalid_state`, appOrigin(req)));
+    return redirectClearingOAuthCookies(new URL(`${loginPage}?error=invalid_state`, appOrigin(req)));
   }
 
   // code_verifier 取得（PKCE）
   const codeVerifier = req.cookies.get("oauth_code_verifier")?.value;
   if (!codeVerifier) {
-    return NextResponse.redirect(new URL(`${loginPage}?error=missing_verifier`, appOrigin(req)));
+    return redirectClearingOAuthCookies(new URL(`${loginPage}?error=missing_verifier`, appOrigin(req)));
   }
 
   const clientId = process.env.GOOGLE_CLIENT_ID;
@@ -109,7 +139,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
   const redirectUri = process.env.NEXT_PUBLIC_GOOGLE_CALLBACK_URL;
 
   if (!clientId || !clientSecret || !redirectUri) {
-    return NextResponse.redirect(new URL(`${loginPage}?error=not_configured`, appOrigin(req)));
+    return redirectClearingOAuthCookies(new URL(`${loginPage}?error=not_configured`, appOrigin(req)));
   }
 
   try {
@@ -129,7 +159,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
 
     if (!tokenRes.ok) {
       console.error("Google token exchange failed:", await tokenRes.text());
-      return NextResponse.redirect(new URL(`${loginPage}?error=token_exchange_failed`, appOrigin(req)));
+      return redirectClearingOAuthCookies(new URL(`${loginPage}?error=token_exchange_failed`, appOrigin(req)));
     }
 
     const tokenData = (await tokenRes.json()) as GoogleTokenResponse;
@@ -142,13 +172,14 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     const userInfo = tokenData.id_token ? decodeIdTokenClaims(tokenData.id_token) : null;
     if (!userInfo) {
       console.error("id_token decode failed");
-      return NextResponse.redirect(new URL(`${loginPage}?error=userinfo_failed`, appOrigin(req)));
+      return redirectClearingOAuthCookies(new URL(`${loginPage}?error=userinfo_failed`, appOrigin(req)));
     }
     const email = userInfo.email?.toLowerCase();
 
     if (!email || !userInfo.email_verified) {
-      console.error("unverified_email:", { email: userInfo.email, email_verified: userInfo.email_verified });
-      return NextResponse.redirect(
+      // PIIをログに残さない：真偽値のみ（メールアドレス自体は出力しない）
+      console.error("unverified_email:", { email_verified: userInfo.email_verified });
+      return redirectClearingOAuthCookies(
         new URL(
           `${loginPage}?error=${encodeURIComponent("メールアドレスが確認できませんでした")}`,
           appOrigin(req)
@@ -161,15 +192,12 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     if (flow === "general") {
       // 見積もり画面：個別に許可されたメールのみログイン可。未許可は申請を記録して通知。
       if (!isAllowedEmail(email)) {
-        const isNew = await recordAccessRequest(email, "general");
-        if (isNew) await notifyAccessRequest(email, "general");
-        return NextResponse.redirect(
-          new URL(`${loginPage}?requested=1&email=${encodeURIComponent(email)}`, appOrigin(req))
-        );
+        await requestAccess(email, "general");
+        return redirectClearingOAuthCookies(new URL(`${loginPage}?requested=1`, appOrigin(req)));
       }
       const token = await makeUserSessionToken(email);
       if (!token) {
-        return NextResponse.redirect(new URL(`${loginPage}?error=session_failed`, appOrigin(req)));
+        return redirectClearingOAuthCookies(new URL(`${loginPage}?error=session_failed`, appOrigin(req)));
       }
       res = NextResponse.redirect(new URL("/", appOrigin(req)));
       res.cookies.set(USER_COOKIE, token, {
@@ -185,16 +213,13 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
       const user = emailsMap[email];
 
       if (!user || !adminUsers()[user]) {
-        const isNew = await recordAccessRequest(email, "admin");
-        if (isNew) await notifyAccessRequest(email, "admin");
-        return NextResponse.redirect(
-          new URL(`${loginPage}?requested=1&email=${encodeURIComponent(email)}`, appOrigin(req))
-        );
+        await requestAccess(email, "admin");
+        return redirectClearingOAuthCookies(new URL(`${loginPage}?requested=1`, appOrigin(req)));
       }
 
       const token = await makeSessionToken(user);
       if (!token) {
-        return NextResponse.redirect(new URL(`${loginPage}?error=session_failed`, appOrigin(req)));
+        return redirectClearingOAuthCookies(new URL(`${loginPage}?error=session_failed`, appOrigin(req)));
       }
       res = NextResponse.redirect(new URL("/admin", appOrigin(req)));
       res.cookies.set(ADMIN_COOKIE, token, {
@@ -214,6 +239,6 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     return res;
   } catch (e) {
     console.error("Google callback error:", e);
-    return NextResponse.redirect(new URL(`${loginPage}?error=server_error`, appOrigin(req)));
+    return redirectClearingOAuthCookies(new URL(`${loginPage}?error=server_error`, appOrigin(req)));
   }
 }

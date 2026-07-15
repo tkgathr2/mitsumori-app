@@ -31,25 +31,59 @@ async function ensureSchema(): Promise<void> {
            created_at timestamptz DEFAULT NOW()
          )`
       );
-    })();
+      // 重複排除の SELECT が Seq Scan にならないように。この関数は許可リスト外の
+      // 任意のGoogleアカウントから到達できるため、行が増えても劣化しないこと。
+      await pool.query(
+        `CREATE INDEX IF NOT EXISTS access_requests_email_flow_created
+           ON access_requests(email, flow, created_at DESC)`
+      );
+    })()
+      .then(() => undefined)
+      // 失敗したPromiseを掴んだままにすると二度と再試行されず申請機能が死ぬ。
+      // 次回呼び出しでやり直せるようにキャッシュを捨てる（price-admin-db.ts と同じ）。
+      .catch((e) => {
+        _schemaReady = null;
+        throw e;
+      });
   }
-  await _schemaReady;
+  return _schemaReady;
+}
+
+export function isDbConfigured(): boolean {
+  return Boolean(process.env.DATABASE_URL);
 }
 
 const DEDUP_WINDOW_MS = 1000 * 60 * 60; // 同じメール・同じ画面への申請は1時間に1回だけ通知（連打対策）
 
-// 申請を記録し、直近1時間以内に同じ申請が無ければ true（＝新規＝通知すべき）を返す。
+// 申請を記録し、新規（＝通知すべき）なら true を返す。
+//
+// 1行 = 1通知。「通知したときだけ」行を入れるので、ウィンドウの起点は常に
+// 「最後に通知した時刻」になる。無条件INSERTにすると起点が毎回前進してしまい、
+// 60分未満の間隔で押し続ける人には永久に初回1件しか通知されない（連打する人ほど救われない）。
+//
+// 判定とINSERTを1文にまとめてあるので、同時リクエストで通知が二重に飛ぶこともない。
 export async function recordAccessRequest(email: string, flow: AccessFlow): Promise<boolean> {
-  await ensureSchema();
-  const pool = getPool();
-  const recent = await pool.query(
-    `SELECT 1 FROM access_requests
-       WHERE email = $1 AND flow = $2 AND created_at > NOW() - ($3 || ' milliseconds')::interval
-       LIMIT 1`,
-    [email, flow, DEDUP_WINDOW_MS]
-  );
-  await pool.query(`INSERT INTO access_requests (email, flow) VALUES ($1, $2)`, [email, flow]);
-  return recent.rowCount === 0;
+  // DB未設定・DB不通のときは「通知する」側に倒す。
+  // 申請を取りこぼすより、通知が重複する方が遥かにマシ。
+  if (!isDbConfigured()) return true;
+  try {
+    await ensureSchema();
+    const res = await getPool().query(
+      `INSERT INTO access_requests (email, flow)
+       SELECT $1::text, $2::text
+        WHERE NOT EXISTS (
+                SELECT 1 FROM access_requests
+                 WHERE email = $1 AND flow = $2
+                   AND created_at > NOW() - ($3 || ' milliseconds')::interval
+              )
+       RETURNING id`,
+      [email, flow, DEDUP_WINDOW_MS]
+    );
+    return (res.rowCount ?? 0) > 0;
+  } catch (e) {
+    console.error("access request record failed:", e);
+    return true;
+  }
 }
 
 const FLOW_LABEL: Record<AccessFlow, string> = {
@@ -59,6 +93,10 @@ const FLOW_LABEL: Record<AccessFlow, string> = {
 
 // 高木さんのSlack user ID（メンション用）。
 const OWNER_SLACK_MENTION = "<@UPFSHKUAW>";
+
+// persona-relay が無応答だとOAuthコールバックごとハングして502/504になるため、
+// 例外だけでなく「返ってこない」も打ち切る。
+const NOTIFY_TIMEOUT_MS = 5000;
 
 // persona-slack-relay（真田Bot名義）経由で申請を通知。失敗しても申請自体は記録済みなので握りつぶす。
 export async function notifyAccessRequest(email: string, flow: AccessFlow): Promise<void> {
@@ -79,6 +117,7 @@ export async function notifyAccessRequest(email: string, flow: AccessFlow): Prom
       method: "POST",
       headers: { "Content-Type": "application/json", "x-relay-secret": secret },
       body: JSON.stringify({ persona: "sanada", channel, text }),
+      signal: AbortSignal.timeout(NOTIFY_TIMEOUT_MS),
     });
   } catch (e) {
     console.error("access request slack notify failed:", e);

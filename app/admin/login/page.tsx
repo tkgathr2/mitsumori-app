@@ -15,12 +15,12 @@ function LoginForm() {
   const [user, setUser] = useState<string>(USERS[0].value);
   const [password, setPassword] = useState("");
   const [err, setErr] = useState("");
-  const [requested, setRequested] = useState<string | null>(null);
+  const [requested, setRequested] = useState(false);
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
     if (searchParams.get("requested") === "1") {
-      setRequested(searchParams.get("email") || "");
+      setRequested(true);
       return;
     }
     const errorParam = searchParams.get("error");
@@ -110,9 +110,9 @@ function LoginForm() {
           Google でログイン
         </button>
 
-        {requested !== null && (
+        {requested && (
           <p style={{ fontSize: 13, margin: "0 0 12px", textAlign: "center" }}>
-            利用申請を受け付けました{requested ? `（${requested}）` : ""}。担当者の承認をお待ちください。
+            アクセス申請を受け付けました。管理者の承認をお待ちください。
           </p>
         )}
 
