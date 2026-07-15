@@ -19,9 +19,11 @@ type GoogleTokenResponse = {
   expires_in: number;
 };
 
+// https://www.googleapis.com/oauth2/v2/userinfo のフィールド名は "verified_email"
+// （OIDCのv3 userinfoで使う "email_verified" とは名前が違う）。
 type GoogleUserInfo = {
   email?: string;
-  email_verified?: boolean;
+  verified_email?: boolean;
   name?: string;
 };
 
@@ -132,8 +134,8 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     const userInfo = (await userRes.json()) as GoogleUserInfo;
     const email = userInfo.email?.toLowerCase();
 
-    if (!email || !userInfo.email_verified) {
-      console.error("unverified_email:", { email: userInfo.email, email_verified: userInfo.email_verified });
+    if (!email || !userInfo.verified_email) {
+      console.error("unverified_email:", { email: userInfo.email, verified_email: userInfo.verified_email });
       return NextResponse.redirect(
         new URL(
           `${loginPage}?error=${encodeURIComponent(`unverified_email: ${userInfo.email ?? "(email無し)"}`)}`,
