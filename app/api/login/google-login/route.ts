@@ -41,6 +41,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     code_challenge: codeChallenge,
     code_challenge_method: "S256",
     state,
+    prompt: "select_account",
   });
 
   const redirectUrl = `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`;
