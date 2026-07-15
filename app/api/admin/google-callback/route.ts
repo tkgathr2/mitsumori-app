@@ -133,7 +133,13 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     const email = userInfo.email?.toLowerCase();
 
     if (!email || !userInfo.email_verified) {
-      return NextResponse.redirect(new URL(`${loginPage}?error=unverified_email`, appOrigin(req)));
+      console.error("unverified_email:", { email: userInfo.email, email_verified: userInfo.email_verified });
+      return NextResponse.redirect(
+        new URL(
+          `${loginPage}?error=${encodeURIComponent(`unverified_email: ${userInfo.email ?? "(email無し)"}`)}`,
+          appOrigin(req)
+        )
+      );
     }
 
     let res: NextResponse;
