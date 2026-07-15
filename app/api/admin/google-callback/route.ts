@@ -19,13 +19,27 @@ type GoogleTokenResponse = {
   expires_in: number;
 };
 
-// https://www.googleapis.com/oauth2/v2/userinfo のフィールド名は "verified_email"
-// （OIDCのv3 userinfoで使う "email_verified" とは名前が違う）。
+// OIDC ID token（JWT）のクレーム。email_verified はOIDC Core仕様で定義済み。
 type GoogleUserInfo = {
   email?: string;
-  verified_email?: boolean;
+  email_verified?: boolean;
   name?: string;
 };
+
+// id_token（JWT: header.payload.signature）の payload 部分だけをデコードする。
+// 署名検証はしない（token交換自体がHTTPS+client_secretでGoogleと直接通信済みのため、
+// 経路上での改ざんリスクは無い＝Authorization Code Flowにおける標準的な信頼範囲）。
+export function decodeIdTokenClaims(idToken: string): GoogleUserInfo | null {
+  try {
+    const payload = idToken.split(".")[1];
+    if (!payload) return null;
+    const padded = payload.replace(/-/g, "+").replace(/_/g, "/");
+    const json = Buffer.from(padded, "base64").toString("utf8");
+    return JSON.parse(json) as GoogleUserInfo;
+  } catch {
+    return null;
+  }
+}
 
 // Railway等のリバースプロキシ配下では req.url がコンテナ内部のホスト(localhost:8080等)を
 // 指すことがあるため、redirect先の組み立ては x-forwarded-host / x-forwarded-proto を優先する。
@@ -119,23 +133,21 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     }
 
     const tokenData = (await tokenRes.json()) as GoogleTokenResponse;
-    const accessToken = tokenData.access_token;
 
-    // ユーザー情報取得
-    const userRes = await fetch("https://www.googleapis.com/oauth2/v2/userinfo", {
-      headers: { Authorization: `Bearer ${accessToken}` },
-    });
-
-    if (!userRes.ok) {
-      console.error("Google userinfo failed:", await userRes.text());
+    // id_token（JWT）のペイロードを直接デコードしてクレームを取る。
+    // userinfoエンドポイントは v2/v3 でフィールド名（verified_email / email_verified）が違い
+    // 取り違えると常に未検証扱いになる事故が起きるため、OIDC仕様で email_verified が
+    // 定義済みの id_token を信頼できる情報源として使う（token交換はHTTPS+client_secretで
+    // 直接Googleと通信しているため署名検証なしでも十分信頼できる）。
+    const userInfo = tokenData.id_token ? decodeIdTokenClaims(tokenData.id_token) : null;
+    if (!userInfo) {
+      console.error("id_token decode failed");
       return NextResponse.redirect(new URL(`${loginPage}?error=userinfo_failed`, appOrigin(req)));
     }
-
-    const userInfo = (await userRes.json()) as GoogleUserInfo;
     const email = userInfo.email?.toLowerCase();
 
-    if (!email || !userInfo.verified_email) {
-      console.error("unverified_email:", { email: userInfo.email, verified_email: userInfo.verified_email });
+    if (!email || !userInfo.email_verified) {
+      console.error("unverified_email:", { email: userInfo.email, email_verified: userInfo.email_verified });
       return NextResponse.redirect(
         new URL(
           `${loginPage}?error=${encodeURIComponent(`unverified_email: ${userInfo.email ?? "(email無し)"}`)}`,
