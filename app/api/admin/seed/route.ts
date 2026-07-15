@@ -12,7 +12,7 @@ export const dynamic = "force-dynamic";
 
 // 新シート（西村さんマスタ）。export CSV → SA API → 直接投入 の順で取り込む。
 const SEED_SHEET_ID = process.env.SEED_SHEET_ID || "1_yO9wq5e-hng5LNdOX7tadDnFtKw-CfE";
-const SEED_GID = process.env.SEED_SHEET_GID || "330210674";
+const SEED_GID = process.env.SEED_SHEET_GID || "1307328336";
 const SEED_RANGE = process.env.SEED_SHEET_RANGE || "A1:Z200";
 
 interface SeedBody {
