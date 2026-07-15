@@ -24,6 +24,14 @@ type GoogleUserInfo = {
   name?: string;
 };
 
+// Railway等のリバースプロキシ配下では req.url がコンテナ内部のホスト(localhost:8080等)を
+// 指すことがあるため、redirect先の組み立ては x-forwarded-host / x-forwarded-proto を優先する。
+function appOrigin(req: NextRequest): string {
+  const proto = req.headers.get("x-forwarded-proto") ?? req.nextUrl.protocol.replace(":", "");
+  const host = req.headers.get("x-forwarded-host") ?? req.headers.get("host") ?? req.nextUrl.host;
+  return `${proto}://${host}`;
+}
+
 function getGoogleEmailsMap(env: NodeJS.ProcessEnv = process.env): Record<string, string> {
   const raw = env.ADMIN_GOOGLE_EMAILS_JSON;
   if (!raw || !raw.trim()) return {};
@@ -50,7 +58,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
   const loginPage = flow === "general" ? "/login" : "/admin/login";
 
   if (flow === "admin" && !adminConfigured()) {
-    return NextResponse.redirect(new URL(`${loginPage}?error=not_configured`, req.url));
+    return NextResponse.redirect(new URL(`${loginPage}?error=not_configured`, appOrigin(req)));
   }
 
   const { searchParams } = new URL(req.url);
@@ -60,23 +68,23 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
 
   // ユーザーが認可キャンセルした場合
   if (error) {
-    return NextResponse.redirect(new URL(`${loginPage}?error=${encodeURIComponent(error)}`, req.url));
+    return NextResponse.redirect(new URL(`${loginPage}?error=${encodeURIComponent(error)}`, appOrigin(req)));
   }
 
   if (!code) {
-    return NextResponse.redirect(new URL(`${loginPage}?error=missing_code`, req.url));
+    return NextResponse.redirect(new URL(`${loginPage}?error=missing_code`, appOrigin(req)));
   }
 
   // state 検証（CSRF 対策）
   const storedState = req.cookies.get("oauth_state")?.value;
   if (!state || !storedState || !timingSafeEqualStr(state, storedState)) {
-    return NextResponse.redirect(new URL(`${loginPage}?error=invalid_state`, req.url));
+    return NextResponse.redirect(new URL(`${loginPage}?error=invalid_state`, appOrigin(req)));
   }
 
   // code_verifier 取得（PKCE）
   const codeVerifier = req.cookies.get("oauth_code_verifier")?.value;
   if (!codeVerifier) {
-    return NextResponse.redirect(new URL(`${loginPage}?error=missing_verifier`, req.url));
+    return NextResponse.redirect(new URL(`${loginPage}?error=missing_verifier`, appOrigin(req)));
   }
 
   const clientId = process.env.GOOGLE_CLIENT_ID;
@@ -84,7 +92,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
   const redirectUri = process.env.NEXT_PUBLIC_GOOGLE_CALLBACK_URL;
 
   if (!clientId || !clientSecret || !redirectUri) {
-    return NextResponse.redirect(new URL(`${loginPage}?error=not_configured`, req.url));
+    return NextResponse.redirect(new URL(`${loginPage}?error=not_configured`, appOrigin(req)));
   }
 
   try {
@@ -104,7 +112,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
 
     if (!tokenRes.ok) {
       console.error("Google token exchange failed:", await tokenRes.text());
-      return NextResponse.redirect(new URL(`${loginPage}?error=token_exchange_failed`, req.url));
+      return NextResponse.redirect(new URL(`${loginPage}?error=token_exchange_failed`, appOrigin(req)));
     }
 
     const tokenData = (await tokenRes.json()) as GoogleTokenResponse;
@@ -117,14 +125,14 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
 
     if (!userRes.ok) {
       console.error("Google userinfo failed:", await userRes.text());
-      return NextResponse.redirect(new URL(`${loginPage}?error=userinfo_failed`, req.url));
+      return NextResponse.redirect(new URL(`${loginPage}?error=userinfo_failed`, appOrigin(req)));
     }
 
     const userInfo = (await userRes.json()) as GoogleUserInfo;
     const email = userInfo.email?.toLowerCase();
 
     if (!email || !userInfo.email_verified) {
-      return NextResponse.redirect(new URL(`${loginPage}?error=unverified_email`, req.url));
+      return NextResponse.redirect(new URL(`${loginPage}?error=unverified_email`, appOrigin(req)));
     }
 
     let res: NextResponse;
@@ -133,14 +141,14 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
       // 見積もり画面：ドメイン許可リストに載っていれば誰でもログイン可
       if (!isAllowedEmail(email)) {
         return NextResponse.redirect(
-          new URL(`${loginPage}?error=${encodeURIComponent(`Email not authorized: ${email}`)}`, req.url)
+          new URL(`${loginPage}?error=${encodeURIComponent(`Email not authorized: ${email}`)}`, appOrigin(req))
         );
       }
       const token = await makeUserSessionToken(email);
       if (!token) {
-        return NextResponse.redirect(new URL(`${loginPage}?error=session_failed`, req.url));
+        return NextResponse.redirect(new URL(`${loginPage}?error=session_failed`, appOrigin(req)));
       }
-      res = NextResponse.redirect(new URL("/", req.url));
+      res = NextResponse.redirect(new URL("/", appOrigin(req)));
       res.cookies.set(USER_COOKIE, token, {
         httpOnly: true,
         secure: process.env.NODE_ENV === "production",
@@ -155,15 +163,15 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
 
       if (!user || !adminUsers()[user]) {
         return NextResponse.redirect(
-          new URL(`${loginPage}?error=${encodeURIComponent(`Email not authorized: ${email}`)}`, req.url)
+          new URL(`${loginPage}?error=${encodeURIComponent(`Email not authorized: ${email}`)}`, appOrigin(req))
         );
       }
 
       const token = await makeSessionToken(user);
       if (!token) {
-        return NextResponse.redirect(new URL(`${loginPage}?error=session_failed`, req.url));
+        return NextResponse.redirect(new URL(`${loginPage}?error=session_failed`, appOrigin(req)));
       }
-      res = NextResponse.redirect(new URL("/admin", req.url));
+      res = NextResponse.redirect(new URL("/admin", appOrigin(req)));
       res.cookies.set(ADMIN_COOKIE, token, {
         httpOnly: true,
         secure: process.env.NODE_ENV === "production",
@@ -181,6 +189,6 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     return res;
   } catch (e) {
     console.error("Google callback error:", e);
-    return NextResponse.redirect(new URL(`${loginPage}?error=server_error`, req.url));
+    return NextResponse.redirect(new URL(`${loginPage}?error=server_error`, appOrigin(req)));
   }
 }
