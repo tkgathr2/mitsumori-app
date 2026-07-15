@@ -1,17 +1,13 @@
 import { type NextRequest, NextResponse } from "next/server";
-import { adminConfigured } from "@/lib/admin-auth";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+// 見積もり画面（一般利用者）向けの Google ログイン開始。
+// 管理画面と同じ Google OAuth クライアント・同じ登録済みリダイレクトURIを使い回し、
+// oauth_flow cookie で「一般ログイン」であることをコールバックに伝える
+// （Google Cloud Console 側にリダイレクトURIを追加登録する必要がない）。
 export async function POST(req: NextRequest): Promise<NextResponse> {
-  if (!adminConfigured()) {
-    return NextResponse.json(
-      { error: "管理機能が未設定です" },
-      { status: 503 }
-    );
-  }
-
   const clientId = process.env.GOOGLE_CLIENT_ID;
   const redirectUri = process.env.NEXT_PUBLIC_GOOGLE_CALLBACK_URL;
 
@@ -22,7 +18,6 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     );
   }
 
-  // PKCE: code_challenge 生成
   const codeVerifier = Array.from(crypto.getRandomValues(new Uint8Array(32)))
     .map((b) => b.toString(16).padStart(2, "0"))
     .join("");
@@ -34,7 +29,6 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     .replace(/\//g, "_")
     .replace(/=/g, "");
 
-  // state: CSRF 対策（session/cookie に保存）
   const state = Array.from(crypto.getRandomValues(new Uint8Array(16)))
     .map((b) => b.toString(16).padStart(2, "0"))
     .join("");
@@ -51,23 +45,22 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
   const redirectUrl = `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`;
 
-  // codeVerifier と state を session cookie に保存（httpOnly）
   const res = NextResponse.json({ redirectUrl });
   res.cookies.set("oauth_code_verifier", codeVerifier, {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
     sameSite: "lax",
     path: "/",
-    maxAge: 60 * 10, // 10分有効
+    maxAge: 60 * 10,
   });
   res.cookies.set("oauth_state", state, {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
     sameSite: "lax",
     path: "/",
-    maxAge: 60 * 10, // 10分有効
+    maxAge: 60 * 10,
   });
-  res.cookies.set("oauth_flow", "admin", {
+  res.cookies.set("oauth_flow", "general", {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
     sameSite: "lax",

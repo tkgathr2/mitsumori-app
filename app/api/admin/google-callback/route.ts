@@ -6,6 +6,7 @@ import {
   makeSessionToken,
   timingSafeEqualStr,
 } from "@/lib/admin-auth";
+import { USER_COOKIE, isAllowedEmail, makeUserSessionToken } from "@/lib/user-auth";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -40,9 +41,16 @@ function getGoogleEmailsMap(env: NodeJS.ProcessEnv = process.env): Record<string
   }
 }
 
+// このコールバックは /admin（既存の管理者ログイン）と /login（見積もり画面の一般ログイン）
+// の両方から共有で使われる。両者は同じ Google OAuth クライアント・同じ登録済み
+// リダイレクトURIを使い回すため、oauth_flow cookie（"admin" | "general"）で
+// どちらのログインだったかを判別する（未設定時は後方互換で "admin" 扱い）。
 export async function GET(req: NextRequest): Promise<NextResponse> {
-  if (!adminConfigured()) {
-    return NextResponse.redirect(new URL("/admin/login?error=not_configured", req.url));
+  const flow = req.cookies.get("oauth_flow")?.value === "general" ? "general" : "admin";
+  const loginPage = flow === "general" ? "/login" : "/admin/login";
+
+  if (flow === "admin" && !adminConfigured()) {
+    return NextResponse.redirect(new URL(`${loginPage}?error=not_configured`, req.url));
   }
 
   const { searchParams } = new URL(req.url);
@@ -52,23 +60,23 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
 
   // ユーザーが認可キャンセルした場合
   if (error) {
-    return NextResponse.redirect(new URL(`/admin/login?error=${encodeURIComponent(error)}`, req.url));
+    return NextResponse.redirect(new URL(`${loginPage}?error=${encodeURIComponent(error)}`, req.url));
   }
 
   if (!code) {
-    return NextResponse.redirect(new URL("/admin/login?error=missing_code", req.url));
+    return NextResponse.redirect(new URL(`${loginPage}?error=missing_code`, req.url));
   }
 
   // state 検証（CSRF 対策）
   const storedState = req.cookies.get("oauth_state")?.value;
   if (!state || !storedState || !timingSafeEqualStr(state, storedState)) {
-    return NextResponse.redirect(new URL("/admin/login?error=invalid_state", req.url));
+    return NextResponse.redirect(new URL(`${loginPage}?error=invalid_state`, req.url));
   }
 
   // code_verifier 取得（PKCE）
   const codeVerifier = req.cookies.get("oauth_code_verifier")?.value;
   if (!codeVerifier) {
-    return NextResponse.redirect(new URL("/admin/login?error=missing_verifier", req.url));
+    return NextResponse.redirect(new URL(`${loginPage}?error=missing_verifier`, req.url));
   }
 
   const clientId = process.env.GOOGLE_CLIENT_ID;
@@ -76,7 +84,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
   const redirectUri = process.env.NEXT_PUBLIC_GOOGLE_CALLBACK_URL;
 
   if (!clientId || !clientSecret || !redirectUri) {
-    return NextResponse.redirect(new URL("/admin/login?error=not_configured", req.url));
+    return NextResponse.redirect(new URL(`${loginPage}?error=not_configured`, req.url));
   }
 
   try {
@@ -96,7 +104,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
 
     if (!tokenRes.ok) {
       console.error("Google token exchange failed:", await tokenRes.text());
-      return NextResponse.redirect(new URL("/admin/login?error=token_exchange_failed", req.url));
+      return NextResponse.redirect(new URL(`${loginPage}?error=token_exchange_failed`, req.url));
     }
 
     const tokenData = (await tokenRes.json()) as GoogleTokenResponse;
@@ -109,48 +117,70 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
 
     if (!userRes.ok) {
       console.error("Google userinfo failed:", await userRes.text());
-      return NextResponse.redirect(new URL("/admin/login?error=userinfo_failed", req.url));
+      return NextResponse.redirect(new URL(`${loginPage}?error=userinfo_failed`, req.url));
     }
 
     const userInfo = (await userRes.json()) as GoogleUserInfo;
     const email = userInfo.email?.toLowerCase();
 
     if (!email || !userInfo.email_verified) {
-      return NextResponse.redirect(new URL("/admin/login?error=unverified_email", req.url));
+      return NextResponse.redirect(new URL(`${loginPage}?error=unverified_email`, req.url));
     }
 
-    // メール → ユーザー特定
-    const emailsMap = getGoogleEmailsMap();
-    const user = emailsMap[email];
+    let res: NextResponse;
 
-    if (!user || !adminUsers()[user]) {
-      // メール未登録またはユーザーが存在しない
-      return NextResponse.redirect(
-        new URL(`/admin/login?error=${encodeURIComponent(`Email not authorized: ${email}`)}`, req.url)
-      );
+    if (flow === "general") {
+      // 見積もり画面：ドメイン許可リストに載っていれば誰でもログイン可
+      if (!isAllowedEmail(email)) {
+        return NextResponse.redirect(
+          new URL(`${loginPage}?error=${encodeURIComponent(`Email not authorized: ${email}`)}`, req.url)
+        );
+      }
+      const token = await makeUserSessionToken(email);
+      if (!token) {
+        return NextResponse.redirect(new URL(`${loginPage}?error=session_failed`, req.url));
+      }
+      res = NextResponse.redirect(new URL("/", req.url));
+      res.cookies.set(USER_COOKIE, token, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "lax",
+        path: "/",
+        maxAge: 60 * 60 * 24 * 30, // 30日（＝以降の再訪問は承認不要）
+      });
+    } else {
+      // 管理画面：個別に許可されたメール→ユーザー名のみログイン可
+      const emailsMap = getGoogleEmailsMap();
+      const user = emailsMap[email];
+
+      if (!user || !adminUsers()[user]) {
+        return NextResponse.redirect(
+          new URL(`${loginPage}?error=${encodeURIComponent(`Email not authorized: ${email}`)}`, req.url)
+        );
+      }
+
+      const token = await makeSessionToken(user);
+      if (!token) {
+        return NextResponse.redirect(new URL(`${loginPage}?error=session_failed`, req.url));
+      }
+      res = NextResponse.redirect(new URL("/admin", req.url));
+      res.cookies.set(ADMIN_COOKIE, token, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "lax",
+        path: "/",
+        maxAge: 60 * 60 * 12, // 12時間
+      });
     }
 
-    // セッション発行
-    const token = await makeSessionToken(user);
-    if (!token) {
-      return NextResponse.redirect(new URL("/admin/login?error=session_failed", req.url));
-    }
-
-    const res = NextResponse.redirect(new URL("/admin", req.url));
-    res.cookies.set(ADMIN_COOKIE, token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
-      path: "/",
-      maxAge: 60 * 60 * 12, // 12時間
-    });
-    // PKCE cookies をクリア
+    // PKCE / flow cookies をクリア
     res.cookies.delete("oauth_code_verifier");
     res.cookies.delete("oauth_state");
+    res.cookies.delete("oauth_flow");
 
     return res;
   } catch (e) {
     console.error("Google callback error:", e);
-    return NextResponse.redirect(new URL("/admin/login?error=server_error", req.url));
+    return NextResponse.redirect(new URL(`${loginPage}?error=server_error`, req.url));
   }
 }
