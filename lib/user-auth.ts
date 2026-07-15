@@ -19,10 +19,14 @@ function allowedDomains(env: NodeJS.ProcessEnv = process.env): string[] {
 }
 
 export function isAllowedEmail(email: string, env: NodeJS.ProcessEnv = process.env): boolean {
-  const domain = email.toLowerCase().split("@")[1];
+  const domain = email.toLowerCase().split("@").pop();
   if (!domain) return false;
   return allowedDomains(env).includes(domain);
 }
+
+// セッションの有効期間（cookieのmaxAgeと揃える＝30日）。トークン自体にも
+// 発行時刻を埋め込み、cookieを書き換えて延命されてもサーバ側で期限切れにできるようにする。
+const SESSION_MAX_AGE_MS = 1000 * 60 * 60 * 24 * 30;
 
 function userSecret(env: NodeJS.ProcessEnv = process.env): string | null {
   const s = env.USER_SESSION_SECRET;
@@ -83,28 +87,32 @@ function decodeEmail(enc: string): string | null {
 
 export async function makeUserSessionToken(
   email: string,
-  env: NodeJS.ProcessEnv = process.env
+  env: NodeJS.ProcessEnv = process.env,
+  issuedAt: number = Date.now()
 ): Promise<string | null> {
   const secret = userSecret(env);
   if (!secret) return null;
   if (!isAllowedEmail(email, env)) return null;
   const encoded = encodeEmail(email.toLowerCase());
-  const sig = await hmacHex(secret, SESSION_PAYLOAD_PREFIX + email.toLowerCase());
-  return `${encoded}.${sig}`;
+  const sig = await hmacHex(secret, `${SESSION_PAYLOAD_PREFIX}${email.toLowerCase()}:${issuedAt}`);
+  return `${encoded}.${issuedAt}.${sig}`;
 }
 
-// cookie 値が正しければメールアドレスを返し、無効なら null。
+// cookie 値が正しく・期限内（発行から30日以内）であればメールアドレスを返し、無効/期限切れなら null。
 export async function verifyUserSessionToken(
   token: string | undefined | null,
   env: NodeJS.ProcessEnv = process.env
 ): Promise<string | null> {
   if (!token) return null;
-  const dot = token.indexOf(".");
-  if (dot <= 0) return null;
-  const encoded = token.slice(0, dot);
+  const parts = token.split(".");
+  if (parts.length !== 3) return null;
+  const [encoded, issuedAtStr, sig] = parts;
+  const issuedAt = Number(issuedAtStr);
+  if (!Number.isFinite(issuedAt)) return null;
+  if (Date.now() - issuedAt > SESSION_MAX_AGE_MS) return null;
   const email = decodeEmail(encoded);
   if (!email) return null;
-  const expected = await makeUserSessionToken(email, env);
+  const expected = await makeUserSessionToken(email, env, issuedAt);
   if (!expected) return null;
-  return timingSafeEqualStr(token, expected) ? email : null;
+  return timingSafeEqualStr(`${encoded}.${issuedAtStr}.${sig}`, expected) ? email : null;
 }

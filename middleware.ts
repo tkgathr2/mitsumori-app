@@ -56,7 +56,23 @@ export async function middleware(req: NextRequest): Promise<NextResponse> {
     return NextResponse.next();
   }
 
-  // 見積もり画面（トップページ）。管理者ログイン済みでもそのまま通す。
+  // 見積もり画面（トップページ）本体・および見積もり画面が使うデータAPI
+  // （単価・見積履歴・MF連携）。ページだけでなくAPIも同じログインで保護する
+  // （バグチェックlab指摘：APIがmiddleware対象外で未ログイン素通りだった）。
+  const isEstimateApi =
+    pathname.startsWith("/api/quotes") ||
+    pathname.startsWith("/api/prices") ||
+    pathname.startsWith("/api/mf-quote") ||
+    pathname.startsWith("/api/mf-auth") ||
+    pathname.startsWith("/api/mf-callback");
+
+  if (isEstimateApi) {
+    if ((await isUserAuthed(req)) || (await isAdminAuthed(req))) {
+      return NextResponse.next();
+    }
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   if (pathname === "/") {
     if ((await isUserAuthed(req)) || (await isAdminAuthed(req))) {
       return NextResponse.next();
@@ -71,5 +87,14 @@ export async function middleware(req: NextRequest): Promise<NextResponse> {
 }
 
 export const config = {
-  matcher: ["/", "/admin/:path*", "/api/admin/:path*"],
+  matcher: [
+    "/",
+    "/admin/:path*",
+    "/api/admin/:path*",
+    "/api/quotes/:path*",
+    "/api/prices/:path*",
+    "/api/mf-quote/:path*",
+    "/api/mf-auth/:path*",
+    "/api/mf-callback/:path*",
+  ],
 };

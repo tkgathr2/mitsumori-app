@@ -20,10 +20,13 @@ function LoginForm() {
     setBusy(true);
     try {
       const res = await fetch("/api/login/google-login", { method: "POST" });
-      const data = (await res.json()) as { redirectUrl?: string };
-      if (data.redirectUrl) {
+      const data = (await res.json()) as { redirectUrl?: string; error?: string };
+      if (res.ok && data.redirectUrl) {
         window.location.href = data.redirectUrl;
+        return;
       }
+      setErr(data.error || "Google ログインの初期化に失敗しました");
+      setBusy(false);
     } catch {
       setErr("Google ログインの初期化に失敗しました");
       setBusy(false);
