@@ -246,7 +246,12 @@ export default function AdminPage() {
     <div className="wrap">
       <header className="hero">
         <h1>単価マスタ管理</h1>
-        <button className="spacer" onClick={logout} style={{ marginLeft: "auto" }}>
+        {/* 見積もり画面へ戻る導線。ログアウトの隣だが、誤ってログアウトさせないよう
+            リンク（枠なし）とボタン（枠あり）で見た目を分ける。 */}
+        <a className="back-to-app" href="/" style={{ marginLeft: "auto" }}>
+          ← 見積もり画面へ戻る
+        </a>
+        <button className="spacer" onClick={logout}>
           ログアウト
         </button>
       </header>

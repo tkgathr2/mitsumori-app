@@ -526,3 +526,22 @@ table.history th {
     grid-template-columns: 1fr 1fr;
   }
 }
+
+/* 管理画面から見積もり画面へ戻る導線。隣のログアウトと押し間違えないよう、
+   枠なしのリンクとして控えめに見せる（ログアウトは枠ありのボタン）。 */
+.back-to-app {
+  color: var(--brand-dark);
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
+  white-space: nowrap;
+  padding: 6px 4px;
+  border-radius: 8px;
+}
+.back-to-app:hover {
+  text-decoration: underline;
+}
+.back-to-app:focus-visible {
+  outline: 2px solid var(--brand-dark);
+  outline-offset: 1px;
+}
