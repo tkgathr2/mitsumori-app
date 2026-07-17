@@ -31,6 +31,7 @@ const USER_LABEL: Record<string, string> = {
   takagi: "高木 社長",
   nishimura: "西村さん",
   admin: "admin",
+  "gas-sync": "シート同期",
 };
 
 function yen(n: number | null): string {
