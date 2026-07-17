@@ -18,7 +18,6 @@ import {
 type ApiData = {
   source: string;
   capturedAt: string;
-  live: boolean;
   fetchedAt: string;
   equipment: EquipmentItem[];
   companies: Company[];
@@ -304,6 +303,24 @@ export default function Page() {
     );
   }
 
+  // 単価が1社も取れなかったときは、見積画面を出さずに理由と次の一手を示す。
+  // （スナップショットへのフォールバックは撤去した＝間違った金額を出すより出さない方が安全）
+  if (data.companies.length === 0) {
+    return (
+      <div className="wrap">
+        <div className="card">
+          <h2>単価を取得できませんでした</h2>
+          <p>
+            管理画面で単価を登録してください。単価は管理画面の単価マスタが正です。
+          </p>
+          <p>
+            <a href="/admin">🔧 管理画面をひらく</a>
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   // 区分の選択肢（単価が0の区分も選べるが0表示）
   const rateOptions = RATE_DEFS;
 
@@ -315,9 +332,9 @@ export default function Page() {
           <h1>みつもりくん</h1>
           <p>会社を選んで、区分・人数・日数を入れるだけで、見積金額が一瞬で出ます。</p>
         </div>
-        <span className={"sync-badge " + (data.live ? "live" : "snapshot")}>
+        <span className="sync-badge live">
           <span className="dot" />
-          {data.live ? "単価シート ライブ同期中" : "単価スナップショット使用中"}
+          単価マスタ（管理画面）を使用中
         </span>
         <a href="/admin" className="admin-link" title="管理画面">
           <svg
@@ -861,7 +878,7 @@ export default function Page() {
           </a>
         </p>
         <p className="muted">
-          単価の元データ：{data.source}（{data.live ? "シートからライブ取得" : "スナップショット"}）
+          単価の元データ：{data.source} ／ 資器材：スナップショット（{data.capturedAt} 取得）
         </p>
       </footer>
 

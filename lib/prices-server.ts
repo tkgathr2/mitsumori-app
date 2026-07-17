@@ -1,138 +1,49 @@
 import "server-only";
-import {
-  type Company,
-  type PriceData,
-  SHEET_ID,
-  SHEET_RANGE,
-  csvUrls,
-  parseCSV,
-  parseCompanyListCsv,
-  readSaCreds,
-  snapshotData,
-} from "./prices";
+import { type Company, type PriceData, snapshotData } from "./prices";
 
-// このモジュールはサーバ専用（googleapis = Node 依存）。
-// クライアントから import される lib/prices.ts には絶対に置かない。
+// このモジュールはサーバ専用。
+//
+// 【単価の正は管理画面（price_companies）だけ】2026-07-17 社長決定により
+// スプレッドシートとの通信は全経路を撤去した（SA直読み／price_cache／公開CSV／GAS受け口）。
+// 単価が取れなかった場合はスナップショットへ落とさず「空」を返す。
+// スナップショットの会社単価は残業単価が0円で、フォールバックに使うと
+// 間違った金額が静かに客先へ出るため。出さない方が安全という設計判断。
 
 // ---- メモリキャッシュ（60秒） ----
 let cache: { data: PriceData; at: number } | null = null;
 const CACHE_MS = 60_000;
 
-// サービスアカウント＋Sheets API でライブ読み取り。
-// 鍵が無い／読めない場合は null を返し、呼び出し側がDBキャッシュ→スナップショットへフォールバック。
-async function tryFetchViaServiceAccount(): Promise<Company[] | null> {
-  const creds = readSaCreds();
-  if (!creds) return null;
+// 管理画面の単価マスタ（price_companies）から会社を読む。
+// DB未設定・接続失敗時は空配列（＝画面側で「取得できません」を出す）。
+async function loadFromAdminDb(): Promise<Company[]> {
+  if (!process.env.DATABASE_URL) return [];
   try {
-    // googleapis は実行時にだけ読む（鍵が無い環境ではロードもしない）
-    const { google } = await import("googleapis");
-    const auth = new google.auth.JWT({
-      email: creds.client_email,
-      key: creds.private_key,
-      scopes: ["https://www.googleapis.com/auth/spreadsheets.readonly"],
-    });
-    const sheets = google.sheets({ version: "v4", auth });
-    const res = await sheets.spreadsheets.values.get({
-      spreadsheetId: SHEET_ID,
-      range: SHEET_RANGE,
-      valueRenderOption: "UNFORMATTED_VALUE",
-    });
-    const rows = (res.data.values || []).map((r) =>
-      (r as unknown[]).map((c) => (c == null ? "" : String(c)))
-    );
-    const companies = parseCompanyListCsv(rows);
-    return companies.length > 0 ? companies : null;
+    const { loadCompaniesForPriceData } = await import("./price-admin-db");
+    return await loadCompaniesForPriceData();
   } catch {
-    return null;
+    return [];
   }
 }
 
-// DBキャッシュ（GASが定期pushした最新データ）経由のライブ取得。
-async function tryFetchFromDbCache(): Promise<Company[] | null> {
-  if (!process.env.DATABASE_URL) return null;
-  try {
-    const { loadPriceCache } = await import("./price-cache-db");
-    const row = await loadPriceCache();
-    if (!row) return null;
-    const payload = row.payload as { companies: Company[] };
-    if (!Array.isArray(payload?.companies) || payload.companies.length === 0)
-      return null;
-    return payload.companies;
-  } catch {
-    return null;
-  }
-}
-
-// 公開CSV経由のライブ取得（シートが公開されている場合のみ成功）。
-async function tryFetchViaPublicCsv(): Promise<Company[] | null> {
-  for (const url of csvUrls()) {
-    try {
-      const res = await fetch(url, {
-        // サーバ側fetch・キャッシュ無効
-        cache: "no-store",
-        redirect: "follow",
-        headers: { "User-Agent": "mitsumori-app/1.0" },
-      });
-      if (!res.ok) continue;
-      const ct = res.headers.get("content-type") || "";
-      const text = await res.text();
-      // ログインページ等のHTMLが返ってきたら失敗扱い
-      if (ct.includes("text/html") || text.trimStart().startsWith("<")) continue;
-      const rows = parseCSV(text);
-      const companies = parseCompanyListCsv(rows);
-      if (companies.length > 0) return companies;
-    } catch {
-      // 次のURLへ
-    }
-  }
-  return null;
-}
-
-// ライブ取得：①SA → ②DBキャッシュ（GAS push）→ ③公開CSV の順に試す。
-async function tryFetchLive(): Promise<Company[] | null> {
-  const viaSa = await tryFetchViaServiceAccount();
-  if (viaSa && viaSa.length) return viaSa;
-  const viaDb = await tryFetchFromDbCache();
-  if (viaDb && viaDb.length) return viaDb;
-  return tryFetchViaPublicCsv();
-}
-
-// DB（単価マスタ）に生きている会社があれば、そこを最優先のデータ源にする。
-// 管理画面 /admin で編集した単価をそのまま見積画面へ反映するための経路。
-async function tryFetchFromAdminDb(): Promise<Company[] | null> {
-  if (!process.env.DATABASE_URL) return null;
-  try {
-    const { hasActiveCompanies, loadCompaniesForPriceData } = await import(
-      "./price-admin-db"
-    );
-    if (!(await hasActiveCompanies())) return null;
-    const companies = await loadCompaniesForPriceData();
-    return companies.length > 0 ? companies : null;
-  } catch {
-    return null;
-  }
-}
-
-// 単価データを返す。①管理DB → ②ライブ取得（シート等）→ ③スナップショット。
+// 単価データを返す。会社は price_companies のみ、資器材等のメタは静的スナップショット。
 export async function getPriceData(): Promise<PriceData> {
   if (cache && Date.now() - cache.at < CACHE_MS) return cache.data;
 
-  let data: PriceData;
-  const fromDb = await tryFetchFromAdminDb();
-  if (fromDb && fromDb.length) {
-    const base = snapshotData(true);
-    data = { ...base, source: "DB (price_companies)", companies: fromDb };
-    cache = { data, at: Date.now() };
-    return data;
-  }
+  const companies = await loadFromAdminDb();
+  const meta = snapshotData();
+  const data: PriceData = {
+    source:
+      companies.length > 0
+        ? "管理画面の単価マスタ (price_companies)"
+        : "単価を取得できませんでした",
+    capturedAt: meta.capturedAt,
+    fetchedAt: new Date().toISOString(),
+    equipment: meta.equipment,
+    companies,
+  };
 
-  const live = await tryFetchLive();
-  if (live && live.length) {
-    const base = snapshotData(true);
-    data = { ...base, companies: live };
-  } else {
-    data = snapshotData(false);
-  }
-  cache = { data, at: Date.now() };
+  // 空（DB未設定・接続失敗）はキャッシュしない。
+  // 一時的なDB断を60秒引きずらず、次のリクエストで復帰できるようにする。
+  if (companies.length > 0) cache = { data, at: Date.now() };
   return data;
 }

@@ -25,20 +25,16 @@ export async function middleware(req: NextRequest): Promise<NextResponse> {
 
   // ログイン系・OAuthコールバックは常に通す（未ログイン状態で叩く経路のため）。
   //
-  // 【M2M窓口の除外ルール】cookie を持たない呼び出し元（GAS・cron・curl 等）が叩く
+  // 【M2M窓口の除外ルール】cookie を持たない呼び出し元（cron・curl 等）が叩く
   // エンドポイントは、route 内で x-api-key を検証する前提で cookie ゲートから除外する。
   // ここに漏れがあると「route の認証は正しいのに middleware が先に 401 を返す」＝
   // 認証が壊れたのではなく経路が死ぬ、という気づきにくい障害になる。
-  //   ・/api/admin/seed     … x-api-key（ADMIN_PASSWORD / PRICE_SYNC_SECRET）を route が検証
-  //   ・/api/prices/update  … GAS（毎時トリガー）が X-API-Key で叩く単価同期の M2M 窓口。
-  //                           route 本体が PRICE_SYNC_SECRET を検証する。
-  //                           ※ 親の "/api/prices" 自体は cookie ゲート対象のまま（下の isEstimateApi）。
+  // ※ 単価同期のM2M窓口（/api/admin/seed・/api/prices/update）は、シート通信の全撤去
+  //    （2026-07-17 社長決定）で route ごと削除したため、この除外リストからも外した。
   if (
     pathname === "/admin/login" ||
     pathname === "/api/admin/login" ||
     pathname === "/api/admin/logout" ||
-    pathname === "/api/admin/seed" ||
-    pathname === "/api/prices/update" ||
     pathname === "/api/admin/google-login" ||
     pathname === "/api/admin/google-callback" ||
     pathname === "/login" ||

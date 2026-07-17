@@ -1,46 +1,23 @@
 import { describe, it, expect } from "vitest";
 import {
-  readSaCreds,
+  snapshotData,
   sortCompanies,
   RATE_DEFS,
   type Company,
 } from "./prices";
 
-describe("readSaCreds", () => {
-  it("GOOGLE_SA_JSON 全文から client_email/private_key を取り出す", () => {
-    const env = {
-      GOOGLE_SA_JSON: JSON.stringify({
-        client_email: "svc@proj.iam.gserviceaccount.com",
-        private_key: "-----BEGIN PRIVATE KEY-----\\nABC\\n-----END PRIVATE KEY-----\\n",
-        type: "service_account",
-      }),
-    } as unknown as NodeJS.ProcessEnv;
-    const creds = readSaCreds(env);
-    expect(creds).not.toBeNull();
-    expect(creds!.client_email).toBe("svc@proj.iam.gserviceaccount.com");
-    // \n が実改行に戻っていること
-    expect(creds!.private_key).toContain("\n");
-    expect(creds!.private_key).not.toContain("\\n");
+// スナップショット（静的ファイル）は資器材の供給元としてだけ残す。
+// 会社単価は残業が0円で、単価の正ではない（＝型としても持たせない）。
+describe("snapshotData", () => {
+  it("資器材を返す（見積画面の資器材はここが供給元）", () => {
+    const meta = snapshotData();
+    expect(meta.equipment.length).toBeGreaterThan(0);
+    expect(meta.equipment[0].price).toBeGreaterThan(0);
+    expect(meta.capturedAt).toBeTruthy();
   });
 
-  it("GOOGLE_SA_EMAIL ＋ GOOGLE_SA_PRIVATE_KEY からも取り出す", () => {
-    const env = {
-      GOOGLE_SA_EMAIL: "svc@proj.iam.gserviceaccount.com",
-      GOOGLE_SA_PRIVATE_KEY: "-----BEGIN-----\\nXYZ\\n-----END-----",
-    } as unknown as NodeJS.ProcessEnv;
-    const creds = readSaCreds(env);
-    expect(creds).not.toBeNull();
-    expect(creds!.client_email).toBe("svc@proj.iam.gserviceaccount.com");
-    expect(creds!.private_key).toBe("-----BEGIN-----\nXYZ\n-----END-----");
-  });
-
-  it("鍵が無ければ null（＝スナップショットへフォールバック）", () => {
-    expect(readSaCreds({} as NodeJS.ProcessEnv)).toBeNull();
-  });
-
-  it("壊れたJSONは個別envへフォールバック（無ければnull）", () => {
-    const env = { GOOGLE_SA_JSON: "{not json" } as unknown as NodeJS.ProcessEnv;
-    expect(readSaCreds(env)).toBeNull();
+  it("会社（0円単価を含むスナップショット）は返さない", () => {
+    expect(snapshotData()).not.toHaveProperty("companies");
   });
 });
 

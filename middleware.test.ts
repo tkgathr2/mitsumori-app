@@ -25,24 +25,17 @@ describe("middleware：ログインゲートの対象範囲", () => {
     expect(res.headers.get("location")).toContain("/login");
   });
 
-  // 【再現テスト・現在RED】
-  // /api/prices/update は GAS（毎時トリガー）が x-api-key ヘッダで叩く M2M 窓口で、cookie を持たない。
-  // route 本体（app/api/prices/update/route.ts:26-29）が PRICE_SYNC_SECRET を検証するため、
-  // middleware の cookie ゲートからは /api/admin/seed と同様に除外しなければならない。
-  // 現状は "/api/prices/:path*" が update まで巻き込み、route 到達前に 401 を返す＝毎時同期が恒久停止する。
-  // 本番実測（2026-07-15）:
-  //   GET https://mitsumori-app-pied.vercel.app/api/prices/update  -> 401 {"error":"Unauthorized"}（middlewareが遮断）
-  //   GET https://mitsumori-app-pied.vercel.app/api/admin/seed     -> 405（middleware通過→route到達＝対照群）
-  it("GASの単価同期(/api/prices/update)はcookie無しでもmiddlewareを通過し、route側のx-api-key認証に委ねる", async () => {
+  // 【シート通信の全撤去・2026-07-17】GASの単価同期窓口(/api/prices/update)と
+  // シードAPI(/api/admin/seed)は route ごと削除したため、cookieゲートの除外リストにも
+  // 残っていてはいけない（消えた route への穴を開けっぱなしにしない）。
+  it("削除した単価同期窓口(/api/prices/update)は除外されず、cookieゲートの対象になる", async () => {
     const res = await middleware(req("/api/prices/update", "POST"));
-    expect(passedThrough(res)).toBe(true);
-    expect(res.status).not.toBe(401);
+    expect(res.status).toBe(401);
+    expect(passedThrough(res)).toBe(false);
   });
 
-  // 除外は update だけ＝親の /api/prices は cookie ゲート対象のまま、という境界を固定する。
-  // （「M2Mを通す」対応で /api/prices ごと素通しにする過剰修正への歯止め）
-  it("除外されるのは /api/prices/update だけで、単価取得API(/api/prices)のゲートは維持される", async () => {
-    const res = await middleware(req("/api/prices"));
+  it("削除したシードAPI(/api/admin/seed)は除外されず、cookieゲートの対象になる", async () => {
+    const res = await middleware(req("/api/admin/seed", "POST"));
     expect(res.status).toBe(401);
     expect(passedThrough(res)).toBe(false);
   });

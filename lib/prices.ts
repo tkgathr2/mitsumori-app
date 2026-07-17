@@ -52,167 +52,35 @@ export interface EquipmentItem {
 }
 
 export interface PriceData {
+  // 単価の出どころ（画面表示用）。単価の正は管理画面（price_companies）のみ。
   source: string;
+  // 資器材スナップショット（data/prices-snapshot.json）の取得日
   capturedAt: string;
-  sheetId: string;
-  live: boolean; // シートからライブ取得できたか（自動同期が効いているか）
   fetchedAt: string;
   equipment: EquipmentItem[];
   companies: Company[];
 }
 
-export const SHEET_ID =
-  process.env.PRICES_SHEET_ID ||
-  "1LPgDarhRJJU_j7vywFI6kSOH8d6kvTPjsGkz--kkiCY";
-
-// シート内の読み取り範囲（A列〜O列＝No,会社コード,会社名＋12単価列）。
-// 1シート目（gid=0）の全行を取り、ヘッダ行はパーサ側で弾く。
-export const SHEET_RANGE = process.env.PRICES_SHEET_RANGE || "A1:O100";
-
-// 公開CSVのエンドポイント候補（公開されていれば読める）
-export function csvUrls(): string[] {
-  return [
-    `https://docs.google.com/spreadsheets/d/${SHEET_ID}/export?format=csv&gid=0`,
-    `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv`,
-  ];
+// 静的ファイル（data/prices-snapshot.json）由来のメタ情報。
+// 資器材（カラーコーン等）はここが供給元＝シート通信ではない。
+//
+// 【companies を返さない理由】スナップショットの会社単価は残業単価が0円で、
+// フォールバックとして使うと「間違った金額が静かに客先へ出る」。
+// 単価の正は管理画面（price_companies）だけなので、型の時点で会社を持たせない。
+export interface SnapshotMeta {
+  capturedAt: string;
+  equipment: EquipmentItem[];
 }
 
-// ---- CSVパーサ（クォート内カンマ対応） ----
-export function parseCSV(text: string): string[][] {
-  const rows: string[][] = [];
-  let row: string[] = [];
-  let cur = "";
-  let q = false;
-  for (let i = 0; i < text.length; i++) {
-    const c = text[i];
-    if (q) {
-      if (c === '"') {
-        if (text[i + 1] === '"') {
-          cur += '"';
-          i++;
-        } else q = false;
-      } else cur += c;
-    } else {
-      if (c === '"') q = true;
-      else if (c === ",") {
-        row.push(cur);
-        cur = "";
-      } else if (c === "\n") {
-        row.push(cur);
-        rows.push(row);
-        row = [];
-        cur = "";
-      } else if (c === "\r") {
-        // skip
-      } else cur += c;
-    }
-  }
-  if (cur !== "" || row.length) {
-    row.push(cur);
-    rows.push(row);
-  }
-  return rows;
-}
-
-function toNum(s: string): number {
-  const n = parseInt((s || "").replace(/[, ]/g, "").trim(), 10);
-  return isNaN(n) ? 0 : n;
-}
-
-// v3_一覧.csv 形式の行を Company[] にする。
-// 列順: No, 会社コード, 会社名, 一般[基本,残業,夜勤,残業,法定休日,残業], 有資格[基本,残業,夜勤,残業,法定休日,残業]
-const RATE_ORDER: RateKey[] = [
-  "ippan_day",
-  "ippan_day_ot",
-  "ippan_night",
-  "ippan_night_ot",
-  "ippan_holiday",
-  "ippan_holiday_ot",
-  "yushi_day",
-  "yushi_day_ot",
-  "yushi_night",
-  "yushi_night_ot",
-  "yushi_holiday",
-  "yushi_holiday_ot",
-];
-
-export function parseCompanyListCsv(rows: string[][]): Company[] {
-  const companies: Company[] = [];
-  for (const r of rows) {
-    if (!/^\d+$/.test((r[0] || "").trim())) continue; // データ行のみ
-    const code = (r[1] || "").trim();
-    const name = (r[2] || "").trim();
-    if (!name) continue;
-    const prices = {} as Record<RateKey, number>;
-    RATE_ORDER.forEach((k, i) => {
-      prices[k] = toNum(r[3 + i]);
-    });
-    const hasPrice = Object.values(prices).some((v) => v > 0);
-    companies.push({ code, name, prices, hasPrice });
-  }
-  return companies;
-}
-
-export function snapshotData(live: boolean): PriceData {
+export function snapshotData(): SnapshotMeta {
   const s = snapshot as unknown as {
-    source: string;
     capturedAt: string;
-    sheetId: string;
     equipment: EquipmentItem[];
-    companies: Company[];
   };
   return {
-    source: s.source,
     capturedAt: s.capturedAt,
-    sheetId: s.sheetId,
-    live,
-    fetchedAt: new Date().toISOString(),
     equipment: s.equipment,
-    // 念のため hasPrice を再計算
-    companies: s.companies.map((c) => ({
-      ...c,
-      hasPrice: Object.values(c.prices).some((v) => v > 0),
-    })),
   };
-}
-
-// ---- サービスアカウント認証情報（env） ----
-// シートを「全公開」にせず、サービスアカウントにだけ閲覧共有して
-// Sheets API で読み取る。鍵は次のいずれかの形で env に入れる：
-//   (A) GOOGLE_SA_JSON … サービスアカウント鍵JSON全文（client_email/private_key を含む）
-//   (B) GOOGLE_SA_EMAIL ＋ GOOGLE_SA_PRIVATE_KEY … メールと秘密鍵を分けて格納
-// private_key 内の "\n" は実改行に戻す（Vercel env は改行を \n で持つことが多い）。
-export interface SaCreds {
-  client_email: string;
-  private_key: string;
-}
-
-export function readSaCreds(
-  env: NodeJS.ProcessEnv = process.env
-): SaCreds | null {
-  const raw = env.GOOGLE_SA_JSON;
-  if (raw && raw.trim()) {
-    try {
-      const j = JSON.parse(raw);
-      if (j.client_email && j.private_key) {
-        return {
-          client_email: String(j.client_email),
-          private_key: String(j.private_key).replace(/\\n/g, "\n"),
-        };
-      }
-    } catch {
-      // JSON崩れ → 個別env / フォールバックへ
-    }
-  }
-  const email = env.GOOGLE_SA_EMAIL;
-  const key = env.GOOGLE_SA_PRIVATE_KEY;
-  if (email && key) {
-    return {
-      client_email: email,
-      private_key: key.replace(/\\n/g, "\n"),
-    };
-  }
-  return null;
 }
 
 // 会社一覧（単価が入っている会社を先頭に）
