@@ -32,6 +32,12 @@ body {
   margin: 0 auto;
   padding: 20px 16px 56px;
 }
+/* 管理画面の単価マトリクス（会社1列＋区分12列）は1080pxだと収まらず
+   常に横スクロールが要る（KZ-121）。管理画面だけ幅を広げて、通常のノートPC
+   画面幅（1366px〜）では横スクロールなしで全区分が見えるようにする。 */
+.wrap.admin-wide {
+  max-width: 1440px;
+}
 
 header.hero {
   display: flex;
@@ -402,14 +408,14 @@ table.matrix .company-meta {
 table.matrix td.price-cell {
   text-align: right;
   cursor: pointer;
-  min-width: 90px;
+  min-width: 78px;
   vertical-align: middle;
 }
 table.matrix td.price-cell:hover {
   background: #f0f7ff;
 }
 table.matrix td.price-cell input {
-  width: 84px;
+  width: 72px;
   padding: 3px 5px;
   text-align: right;
   font-size: 13px;

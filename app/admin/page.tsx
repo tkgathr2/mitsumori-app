@@ -243,7 +243,7 @@ export default function AdminPage() {
   }
 
   return (
-    <div className="wrap">
+    <div className="wrap admin-wide">
       <header className="hero">
         <h1>単価マスタ管理</h1>
         {/* 見積もり画面へ戻る導線。ログアウトの隣だが、誤ってログアウトさせないよう
