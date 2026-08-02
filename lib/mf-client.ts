@@ -60,6 +60,24 @@ export interface MfQuote {
   [k: string]: unknown;
 }
 
+async function doFetch(path: string, init: RequestInit, token: string): Promise<Response> {
+  const headers: Record<string, string> = {
+    Authorization: `Bearer ${token}`,
+    Accept: "application/json",
+    ...(init.headers as Record<string, string> | undefined),
+  };
+  if (init.body) headers["Content-Type"] = "application/json";
+  return fetch(`${MF_API_BASE}${path}`, { ...init, headers });
+}
+
+// MFが「token_missing / Access token is missing」等のトークン系エラーを返したか判定する。
+// レスポンスは読み捨てないよう呼び出し側で1回だけ読み、判定後は再利用する。
+async function isTokenError(res: Response): Promise<boolean> {
+  if (res.status !== 401) return false;
+  const text = await res.clone().text().catch(() => "");
+  return /token_missing|invalid_token|token_expired/i.test(text);
+}
+
 async function mfFetch(
   path: string,
   init: RequestInit & { accessToken?: string } = {}
@@ -70,13 +88,20 @@ async function mfFetch(
       "MF未連携です。/api/mf-auth から認可（OAuth）を完了してください。"
     );
   }
-  const headers: Record<string, string> = {
-    Authorization: `Bearer ${token}`,
-    Accept: "application/json",
-    ...(init.headers as Record<string, string> | undefined),
-  };
-  if (init.body) headers["Content-Type"] = "application/json";
-  return fetch(`${MF_API_BASE}${path}`, { ...init, headers });
+  const res = await doFetch(path, init, token);
+
+  // 保存済みトークンはexpires_at上まだ有効に見えるのにMF側で失効・拒否されている
+  // ケース（KZ-122：見積作成時にtoken_missingで完全に止まる）を、強制refreshした
+  // トークンで1回だけ救済リトライする。createMfQuote は取引先検索/作成・見積作成の
+  // 複数呼び出しに同じtokenを引き回すが、各呼び出しはここで独立に自己修復するため、
+  // 呼び出し元がaccessTokenを明示していても対象にする。
+  if (await isTokenError(res)) {
+    const fresh = await getValidAccessToken({ force: true });
+    if (fresh && fresh !== token) {
+      return doFetch(path, init, fresh);
+    }
+  }
+  return res;
 }
 
 async function readError(res: Response): Promise<string> {

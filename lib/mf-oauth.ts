@@ -155,16 +155,23 @@ export async function refreshTokens(
 
 // 有効な access_token を返す。期限切れなら自動でrefreshする。
 // トークンが1つも無い場合は null（=未連携。OAuthを最初に通す必要あり）。
-export async function getValidAccessToken(): Promise<string | null> {
+// force=true は「保存済みのaccess_tokenが期限内でも信用せず、必ずrefreshし直す」モード。
+// MF側がaccess_tokenを失効・拒否している（token_missing等）のに、こちら側の
+// expires_atの計算上はまだ有効に見えるケース（クロックずれ・MF側の先行失効）を
+// 401リトライ経由で救うために使う。
+export async function getValidAccessToken(
+  opts: { force?: boolean } = {}
+): Promise<string | null> {
   const rec = await loadTokens();
   if (!rec || !rec.refresh_token) return null;
 
   const stillValid =
+    !opts.force &&
     rec.access_token &&
     rec.access_expires_at - EXPIRY_SKEW_MS > Date.now();
   if (stillValid) return rec.access_token;
 
-  // access_token が無い/期限切れ → refresh
+  // access_token が無い/期限切れ/強制更新 → refresh
   const refreshed = await refreshTokens(rec.refresh_token);
   return refreshed.access_token || null;
 }
