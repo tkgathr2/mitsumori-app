@@ -10,7 +10,7 @@ vi.mock("./mf-oauth", () => ({
   getValidAccessToken: mocks.getValidAccessToken,
 }));
 
-import { findPartnerByName } from "./mf-client";
+import { findPartnerByName, fetchQuotePdf } from "./mf-client";
 
 function jsonResponse(status: number, body: unknown): Response {
   return new Response(JSON.stringify(body), {
@@ -75,5 +75,63 @@ describe("mfFetch トークン失効時の自動リトライ（KZ-122）", () =>
       .mockResolvedValueOnce(jsonResponse(401, { error: "token_missing" }));
 
     await expect(findPartnerByName("X")).rejects.toThrow("取引先検索に失敗");
+  });
+});
+
+describe("fetchQuotePdf（KZ-122：PDFをブラウザへ直接渡さずサーバー側で認証して中継）", () => {
+  it("access_tokenを付けてPDFバイナリを取得できる", async () => {
+    mocks.getValidAccessToken.mockResolvedValueOnce("stale_token");
+
+    const pdfBytes = new Uint8Array([0x25, 0x50, 0x44, 0x46]); // %PDF
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      new Response(pdfBytes, {
+        status: 200,
+        headers: { "Content-Type": "application/pdf" },
+      })
+    );
+
+    const result = await fetchQuotePdf("quote-1");
+
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+    expect(fetchSpy.mock.calls[0][0]).toBe(
+      `${"https://invoice.moneyforward.com/api/v3"}/quotes/quote-1.pdf`
+    );
+    expect(fetchSpy.mock.calls[0][1]?.headers).toMatchObject({
+      Authorization: "Bearer stale_token",
+    });
+    expect(result.contentType).toBe("application/pdf");
+    expect(new Uint8Array(result.body)).toEqual(pdfBytes);
+  });
+
+  it("token_missingで401ならmfFetch同様に強制refreshして1回だけ再試行する", async () => {
+    mocks.getValidAccessToken.mockResolvedValueOnce("stale_token");
+    mocks.getValidAccessToken.mockResolvedValueOnce("fresh_token");
+
+    const pdfBytes = new Uint8Array([0x25, 0x50, 0x44, 0x46]);
+    vi.spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(
+        jsonResponse(401, { error: "token_missing" })
+      )
+      .mockResolvedValueOnce(
+        new Response(pdfBytes, {
+          status: 200,
+          headers: { "Content-Type": "application/pdf" },
+        })
+      );
+
+    const result = await fetchQuotePdf("quote-1");
+    expect(new Uint8Array(result.body)).toEqual(pdfBytes);
+    expect(mocks.getValidAccessToken).toHaveBeenCalledWith({ force: true });
+  });
+
+  it("取得に失敗したらエラーを投げる", async () => {
+    mocks.getValidAccessToken.mockResolvedValueOnce("tok");
+    vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      jsonResponse(404, { error: "not_found" })
+    );
+
+    await expect(fetchQuotePdf("missing")).rejects.toThrow(
+      "見積書PDF取得に失敗"
+    );
   });
 });

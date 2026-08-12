@@ -204,6 +204,29 @@ export function quotePdfUrl(quoteId: string): string {
   return `${MF_API_BASE}/quotes/${encodeURIComponent(quoteId)}.pdf`;
 }
 
+// 見積書PDFのバイナリを取得する。
+// MFのquotes/{id}.pdfはBearer認証必須のAPIエンドポイントであり、pdf_urlを
+// ブラウザから直接開くとAuthorizationヘッダが付かず token_missing になる
+// （KZ-122：見積作成自体は成功していたが、PDF表示の場面でこのエラーが出ていた）。
+// サーバー側で認証してバイナリを中継することでブラウザから直接開ける形にする。
+export async function fetchQuotePdf(
+  quoteId: string,
+  accessToken?: string
+): Promise<{ body: ArrayBuffer; contentType: string }> {
+  const res = await mfFetch(`/quotes/${encodeURIComponent(quoteId)}.pdf`, {
+    method: "GET",
+    headers: { Accept: "application/pdf" },
+    accessToken,
+  });
+  if (!res.ok) {
+    throw new Error(`見積書PDF取得に失敗: ${await readError(res)}`);
+  }
+  return {
+    body: await res.arrayBuffer(),
+    contentType: res.headers.get("content-type") || "application/pdf",
+  };
+}
+
 // 見積書を削除（テスト用クリーンアップ）
 export async function deleteQuote(
   quoteId: string,
