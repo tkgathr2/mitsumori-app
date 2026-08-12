@@ -321,6 +321,28 @@ footer.foot a {
   color: #fff;
 }
 
+/* 有資格警備員の料金列は右側6列目以降にあり毎回横スクロールが必要だったため、
+   表示区分を絞り込むトグル（KZ-121）。 */
+.rate-filter {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.rate-filter button {
+  padding: 6px 12px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.rate-filter button.active {
+  background: var(--brand);
+  border-color: var(--brand);
+  color: #fff;
+}
+
 .matrix-scroll {
   overflow-x: auto;
   border: 1px solid var(--line);
@@ -360,6 +382,13 @@ table.matrix thead th {
   vertical-align: bottom;
   z-index: 1;
   padding: 0;
+}
+/* 区分名（例：有資格警備員（法定休日・残業/時）＝16文字）を1行nowrapで
+   確保すると列が横に膨張し、横スクロール量が増える主因になっていた（KZ-121）。
+   見出しだけ折り返しを許可して列幅を詰める（金額セルはnowrapのまま数値が崩れない）。 */
+table.matrix th:not(.company-col) {
+  white-space: normal;
+  max-width: 112px;
 }
 table.matrix th.company-col {
   position: sticky;
