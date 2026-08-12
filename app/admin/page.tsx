@@ -66,12 +66,29 @@ function SortArrow({ active, dir }: { active: boolean; dir?: SortDir }) {
   );
 }
 
+// 単価マトリクスの列は「一般警備員」6区分＋「有資格警備員」6区分の計12列あり、
+// 有資格列は右側（7列目以降）に並ぶため毎回横スクロールしないと確認できなかった（KZ-121）。
+// このフィルタで表示区分を絞り込み、有資格だけを横スクロールなしで確認できるようにする。
+type RateFilter = "all" | "ippan" | "yushi";
+const RATE_FILTER_LABEL: Record<RateFilter, string> = {
+  all: "すべて",
+  ippan: "一般警備員のみ",
+  yushi: "有資格警備員のみ",
+};
+
 export default function AdminPage() {
   const [tab, setTab] = useState<"matrix" | "history">("matrix");
   const [companies, setCompanies] = useState<AdminCompany[]>([]);
   const [history, setHistory] = useState<HistoryRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState("");
+  const [rateFilter, setRateFilter] = useState<RateFilter>("all");
+
+  const visibleRateDefs = useMemo(() => {
+    if (rateFilter === "all") return RATE_DEFS;
+    const prefix = rateFilter === "ippan" ? "ippan_" : "yushi_";
+    return RATE_DEFS.filter((d) => d.key.startsWith(prefix));
+  }, [rateFilter]);
 
   // 編集中のセル { companyId, rateKey }
   const [editing, setEditing] = useState<{ id: number; key: RateKey } | null>(
@@ -320,7 +337,24 @@ export default function AdminPage() {
               </p>
             </div>
           ) : (
-            <div className="matrix-scroll">
+            <>
+              <div
+                className="rate-filter"
+                role="group"
+                aria-label="表示する料金区分"
+              >
+                {(["all", "ippan", "yushi"] as RateFilter[]).map((f) => (
+                  <button
+                    key={f}
+                    type="button"
+                    className={rateFilter === f ? "active" : ""}
+                    onClick={() => setRateFilter(f)}
+                  >
+                    {RATE_FILTER_LABEL[f]}
+                  </button>
+                ))}
+              </div>
+              <div className="matrix-scroll">
               <table className="matrix">
                 <thead>
                   <tr>
@@ -338,7 +372,7 @@ export default function AdminPage() {
                         <SortArrow active={sort?.key === "company"} dir={sort?.dir} />
                       </button>
                     </th>
-                    {RATE_DEFS.map((d) => (
+                    {visibleRateDefs.map((d) => (
                       <th key={d.key} className="sortable" aria-sort={ariaSort(d.key)}>
                         <button
                           type="button"
@@ -385,7 +419,7 @@ export default function AdminPage() {
                           <div className="company-meta">コード: {c.code || "—"}</div>
                         </div>
                       </th>
-                      {RATE_DEFS.map((d) => {
+                      {visibleRateDefs.map((d) => {
                         const isEd =
                           editing &&
                           editing.id === c.id &&
@@ -424,7 +458,8 @@ export default function AdminPage() {
                   ))}
                 </tbody>
               </table>
-            </div>
+              </div>
+            </>
           )}
         </>
       ) : (
