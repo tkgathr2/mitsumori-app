@@ -274,9 +274,15 @@ export default function Page() {
       });
       const j = await res.json();
       setToast(j.message || "送信しました");
-      // 見積書PDFができたら新しいタブで開く
-      if (j.ok && j.pdfUrl) {
-        window.open(j.pdfUrl, "_blank", "noopener,noreferrer");
+      // 見積書PDFができたら新しいタブで開く。
+      // MFのpdf_urlはBearer認証必須のAPIエンドポイントで、ブラウザから直接開くと
+      // token_missingになる（KZ-122）ため、サーバー側で認証して中継する自前プロキシを開く。
+      if (j.ok && j.quoteId) {
+        window.open(
+          `/api/mf-quote/pdf?quoteId=${encodeURIComponent(j.quoteId)}`,
+          "_blank",
+          "noopener,noreferrer"
+        );
       }
       // MFに作成できた見積は履歴にも自動保存
       if (j.ok) void saveCurrentQuote(true);
