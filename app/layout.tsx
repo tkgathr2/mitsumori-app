@@ -29,11 +29,28 @@ export default function RootLayout({
     <html lang="ja">
       <body>
         {children}
-        <Script
-          src="https://kaizen.takagi.bz/widget.js"
-          data-sys="mitsumori"
-          strategy="lazyOnload"
-        />
+        {/*
+          カイゼンくんウィジェット：小窓は別オリジンiframeでGoogleログインが原理的に不可のため、
+          ホスト（みつもりくん）のログイン済みユーザーを /api/me で取得し window.kaizenUser に
+          セットしてから widget.js を読み込む（未ログイン/取得失敗でもウィジェット自体は出す）。
+        */}
+        <Script id="kaizen-widget-loader" strategy="lazyOnload">
+          {`
+            (function () {
+              try {
+                fetch('/api/me', { credentials: 'same-origin' })
+                  .then(function (r) { return r.ok ? r.json() : null; })
+                  .then(function (d) { if (d && d.user) window.kaizenUser = d.user; })
+                  .catch(function () {});
+              } catch (e) {}
+              var s = document.createElement('script');
+              s.src = 'https://kaizen.takagi.bz/widget.js';
+              s.setAttribute('data-sys', 'mitsumori');
+              s.defer = true;
+              document.head.appendChild(s);
+            })();
+          `}
+        </Script>
       </body>
     </html>
   );
