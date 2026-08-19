@@ -37,17 +37,28 @@ export default function RootLayout({
         <Script id="kaizen-widget-loader" strategy="lazyOnload">
           {`
             (function () {
+              var appended = false;
+              function loadWidget() {
+                if (appended) return;
+                appended = true;
+                var s = document.createElement('script');
+                s.src = 'https://kaizen.takagi.bz/widget.js';
+                s.setAttribute('data-sys', 'mitsumori');
+                document.head.appendChild(s);
+              }
               try {
+                var timeoutId = setTimeout(loadWidget, 3000);
                 fetch('/api/me', { credentials: 'same-origin' })
                   .then(function (r) { return r.ok ? r.json() : null; })
-                  .then(function (d) { if (d && d.user) window.kaizenUser = d.user; })
-                  .catch(function () {});
-              } catch (e) {}
-              var s = document.createElement('script');
-              s.src = 'https://kaizen.takagi.bz/widget.js';
-              s.setAttribute('data-sys', 'mitsumori');
-              s.defer = true;
-              document.head.appendChild(s);
+                  .then(function (d) { if (d && typeof d.user === 'string' && d.user) window.kaizenUser = d.user; })
+                  .catch(function () {})
+                  .finally(function () {
+                    clearTimeout(timeoutId);
+                    loadWidget();
+                  });
+              } catch (e) {
+                loadWidget();
+              }
             })();
           `}
         </Script>
