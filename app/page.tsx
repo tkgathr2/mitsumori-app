@@ -416,6 +416,7 @@ export default function Page() {
                               border: companyCode === code ? "2px solid #007bff" : "1px solid #ddd",
                               borderRadius: "4px",
                               cursor: "pointer",
+                              fontSize: "18px",
                             }}
                             onMouseEnter={(e) => (e.currentTarget.style.background = "#f5f5f5")}
                             onMouseLeave={(e) =>
@@ -442,6 +443,7 @@ export default function Page() {
                         border: companyCode === c.code ? "2px solid #007bff" : "1px solid #ddd",
                         borderRadius: "4px",
                         cursor: "pointer",
+                        fontSize: "18px",
                       }}
                       onMouseEnter={(e) => (e.currentTarget.style.background = "#f5f5f5")}
                       onMouseLeave={(e) =>
@@ -483,7 +485,7 @@ export default function Page() {
                       padding: "8px",
                       border: "1px solid #ccc",
                       borderRadius: "4px",
-                      fontSize: "14px",
+                      fontSize: "18px",
                     }}
                   />
                   {showCompanyList && companySearch !== undefined && (
@@ -517,7 +519,7 @@ export default function Page() {
                               padding: "8px 12px",
                               cursor: "pointer",
                               borderBottom: "1px solid #eee",
-                              fontSize: "14px",
+                              fontSize: "18px",
                             }}
                             onMouseEnter={(e) =>
                               (e.currentTarget.style.background = "#f5f5f5")
